@@ -1,18 +1,26 @@
 // src\app\telegram\bot.ts
-import { Telegraf, session } from "telegraf";
-// import session from "telegraf/session";
 
-import { startHandler } from "./handlers/start";
-import { handleMessage, handleReplyButton } from "./handlers/message";
-const bot = new Telegraf(process.env.BOT_TOKEN!);
-// اضافه کردن middleware session
-// cast to any to satisfy TypeScript typings for the imported session module
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-bot.use(session());
-bot.start(startHandler()); // اینجا هندلر استارت جدید
+import { Telegraf, session } from 'telegraf';
+import type { BotContext, BotSession } from './context';
+import { authMiddleware } from './middleware/auth';
+import { startHandler } from './handlers/start';
+import { messageRouter } from './handlers/message';
 
-bot.on("text", handleMessage);
-bot.action(/reply_to_(.+)/, handleReplyButton); // اضافه کردن هندلر جدید برای دکمه Reply
+const bot = new Telegraf<BotContext>(process.env.BOT_TOKEN!);
+
+// ─── Middleware ها (ترتیب مهم است) ───────────────────────
+
+// ۱. session (باید قبل از auth باشد)
+bot.use(session<BotSession>());
+
+// ۲. احراز هویت + بارگذاری کاربر از DB
+bot.use(authMiddleware);
+
+// ─── Handler ها ──────────────────────────────────────────
+
+bot.start(startHandler);
+bot.on('text', messageRouter);
+
 
 export async function POST(req: Request) {
        try {
