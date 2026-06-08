@@ -8,11 +8,10 @@ import {
        Document,
        Model,
        Types,
-       FilterQuery,
+
 } from 'mongoose';
 import { Gender, UserState, ProximityKm, COIN_COST_FEMALE_CHAT } from '@/types/enums'
 import type { IranProvince } from '@/types/iran';
-
 // ─── Interface ────────────────────────────────
 
 export interface IGeoPoint {
@@ -59,7 +58,7 @@ export interface IUserModel extends Model<IUserDocument> {
        findNearby(
               coordinates: [number, number],
               maxDistanceKm: ProximityKm,
-              filter: FilterQuery<IUser>,
+              filter: Record<string, unknown>,
               excludeIds: number[],
        ): Promise<IUserDocument[]>;
 }
@@ -144,10 +143,10 @@ UserSchema.statics.findByInviteCode = function (
 UserSchema.statics.findNearby = function (
        coordinates: [number, number],
        maxDistanceKm: ProximityKm,
-       filter: FilterQuery<IUser>,
+       filter: Record<string, unknown>,
        excludeIds: number[],
 ): Promise<IUserDocument[]> {
-       const query: FilterQuery<IUser> = {
+       const query: Record<string, unknown> = {
               ...filter,
               isBanned: false,
               profileComplete: true,
