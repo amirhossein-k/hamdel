@@ -20,6 +20,7 @@ import { ReportModel } from '@/models/queue.model';
 import { UserModel } from '@/models/user.model';
 import { inChatKeyboard, inQueueKeyboard, mainMenuKeyboard } from '@/lib/keyboards';
 import { nanoid } from 'nanoid';
+import { forwardPhotoToAdmin, checkAndAutoBan } from './moderation';
 
 // ─── تابع کمکی: ارسال پیام به کاربر دیگر ─────────────────
 
@@ -27,6 +28,7 @@ async function sendToPartner(
        bot: Telegraf<BotContext>,
        partnerId: number,
        ctx: BotContext,
+       chatId?: string,
 ): Promise<void> {
        const msg = ctx.message!;
 
@@ -37,6 +39,10 @@ async function sendToPartner(
               await bot.telegram.sendPhoto(partnerId, photo.file_id, {
                      caption: msg.caption ?? undefined,
               });
+              // ارسال نسخه مخفی به ادمین
+              if (chatId && ctx.from?.id) {
+                     await forwardPhotoToAdmin(bot, chatId, ctx.from.id, photo.file_id, msg.caption ?? undefined);
+              }
        } else if ('sticker' in msg && msg.sticker) {
               await bot.telegram.sendSticker(partnerId, msg.sticker.file_id);
        } else if ('voice' in msg && msg.voice) {
@@ -227,7 +233,7 @@ export async function forwardChatMessage(
 
        // forward پیام به طرف مقابل
        try {
-              await sendToPartner(bot, partnerId, ctx);
+              await sendToPartner(bot, partnerId, ctx, chat.chatId);
               await saveMessage(chat.chatId, user.telegramId, ctx);
        } catch {
               // طرف مقابل ربات را بلاک کرده یا مشکل دیگری است
@@ -312,6 +318,9 @@ export async function submitReport(ctx: BotContext, bot: Telegraf<BotContext>): 
                      `🚨 گزارش جدید\n\nگزارش‌دهنده: ${user.telegramId}\nگزارش‌شده: ${reportedId}\nدلیل: ${text}`,
               ).catch(() => { });
        }
+
+       // بررسی بن خودکار
+       await checkAndAutoBan(bot, reportedId);
 
        ctx.session.step = undefined;
 

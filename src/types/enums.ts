@@ -91,3 +91,22 @@ export const COIN_PACKAGES: readonly CoinPackage[] = [
        { id: CoinPackageId.Pack60, coins: 60, price: 15_000 },
        { id: CoinPackageId.Pack120, coins: 120, price: 27_000 },
 ] as const;
+// ─── ثابت‌های مدیریت گزارش ───────────────────
+export const AUTO_BAN_THRESHOLD = 3;   // تعداد گزارش برای بن خودکار
+export const AUTO_WARN_THRESHOLD = 1;  // تعداد گزارش برای اخطار خودکار
+
+// ─── علایق ───────────────────────────────────
+export const INTERESTS = [
+       '🎮 بازی',
+       '🎵 موسیقی',
+       '📚 مطالعه',
+       '🏋️ ورزش',
+       '🎬 فیلم و سریال',
+       '🍳 آشپزی',
+       '✈️ سفر',
+       '🎨 هنر',
+       '💻 تکنولوژی',
+       '📸 عکاسی',
+] as const;
+
+export type Interest = typeof INTERESTS[number];

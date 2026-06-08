@@ -2,8 +2,10 @@
 // ─── هندلر ثبت‌نام کاربر ────────────────────────────────
 // مراحل: set_gender → set_name → set_age → set_province → set_city → complete
 
+import type { Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
 import { UserState, Gender, MIN_AGE, MAX_AGE } from '@/types/enums';
+import { rewardInviter } from './invite';
 import { IRAN_PROVINCES, isCityInProvince } from '@/types/iran';
 import type { IranProvince } from '@/types/iran';
 import {
@@ -46,7 +48,7 @@ export async function askGender(ctx: BotContext): Promise<void> {
 //  روتر ثبت‌نام — بر اساس state کاربر مرحله بعد را صدا می‌زند
 // ══════════════════════════════════════════════════════════
 
-export async function handleRegistrationStep(ctx: BotContext): Promise<void> {
+export async function handleRegistrationStep(ctx: BotContext, bot?: Telegraf<BotContext>): Promise<void> {
        const user = ctx.dbUser!;
        const text = getText(ctx);
 
@@ -134,6 +136,11 @@ export async function handleRegistrationStep(ctx: BotContext): Promise<void> {
                      user.state = UserState.Complete;
                      user.profileComplete = true;
                      await user.save();
+
+                     // ─── پاداش دعوت ──────────────────────────────────────
+                     if (user.invitedBy && bot) {
+                            await rewardInviter(bot, user.telegramId, user.invitedBy);
+                     }
 
                      await ctx.reply(
                             `✅ ثبت‌نام کامل شد!\n\n` +

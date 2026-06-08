@@ -1,11 +1,22 @@
 // src/app/telegram/handlers/message.ts
 // ─── روتر اصلی پیام‌ها ───────────────────────────────────
-// بر اساس state کاربر تصمیم می‌گیرد کجا بفرستد
 
+import { Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
 import { UserState } from '@/types/enums';
 import { handleRegistrationStep } from './registration';
 import { mainMenuKeyboard } from '@/lib/keyboards';
+import { joinRandomQueue, leaveQueue, forwardChatMessage, submitReport } from './random-chat';
+import { startDirectChat, handleDirectChatSearch } from './direct-chat';
+import { showCoinsPage } from './coin';
+import { showInvitePage } from './invite';
+import {
+       showSettingsMenu,
+       handleEditName,
+       handleEditAge,
+       handleEditProvince,
+       handleEditCity,
+} from './settings';
 
 // ─── متن پیام ────────────────────────────────────────────
 
@@ -18,66 +29,100 @@ function getText(ctx: BotContext): string | null {
 //  روتر اصلی
 // ══════════════════════════════════════════════════════════
 
-export async function messageRouter(ctx: BotContext): Promise<void> {
-       const user = ctx.dbUser;
+export function makeMessageRouter(bot: Telegraf<BotContext>) {
+       return async function messageRouter(ctx: BotContext): Promise<void> {
+              const user = ctx.dbUser;
 
-       if (!user) {
-              await ctx.reply('❌ خطا. لطفاً /start بزن.');
-              return;
-       }
+              if (!user) {
+                     await ctx.reply('❌ خطا. لطفاً /start بزن.');
+                     return;
+              }
 
-       const text = getText(ctx);
+              const text = getText(ctx);
 
-       switch (user.state) {
+              // ─── session steps ───────────────────────────────────
 
-              // ─── در حال ثبت‌نام ───────────────────────────────────
-              case UserState.Start:
-              case UserState.SetGender:
-              case UserState.SetName:
-              case UserState.SetAge:
-              case UserState.SetProvince:
-              case UserState.SetCity:
-                     await handleRegistrationStep(ctx);
-                     break;
+              const step = ctx.session.step;
 
-              // ─── منوی اصلی ────────────────────────────────────────
-              case UserState.Complete:
-                     await handleMainMenu(ctx, text);
-                     break;
+              if (step?.startsWith('report:')) {
+                     await submitReport(ctx, bot);
+                     return;
+              }
 
-              // ─── در صف انتظار ─────────────────────────────────────
-              case UserState.InQueue:
-                     if (text === '❌ لغو جستجو') {
-                            // TODO: مرحله ۴ — random-chat handler
-                            await ctx.reply('جستجو لغو شد.', mainMenuKeyboard);
-                     } else {
-                            await ctx.reply('⏳ داری دنبال همصحبت می‌گردیم... برای لغو «❌ لغو جستجو» بزن.');
-                     }
-                     break;
+              if (step === 'direct:search') {
+                     await handleDirectChatSearch(ctx, bot);
+                     return;
+              }
 
-              // ─── در چت فعال ──────────────────────────────────────
-              case UserState.InChat:
-                     // TODO: مرحله ۴ — forward پیام به طرف مقابل
-                     await ctx.reply('🔧 سیستم چت به زودی فعال می‌شه.');
-                     break;
-       }
+              if (step === 'settings:name') {
+                     await handleEditName(ctx);
+                     return;
+              }
+
+              if (step === 'settings:age') {
+                     await handleEditAge(ctx);
+                     return;
+              }
+
+              if (step === 'settings:province') {
+                     await handleEditProvince(ctx);
+                     return;
+              }
+
+              if (step === 'settings:city') {
+                     await handleEditCity(ctx);
+                     return;
+              }
+
+              // ─── state-based routing ─────────────────────────────
+
+              switch (user.state) {
+
+                     case UserState.Start:
+                     case UserState.SetGender:
+                     case UserState.SetName:
+                     case UserState.SetAge:
+                     case UserState.SetProvince:
+                     case UserState.SetCity:
+                            await handleRegistrationStep(ctx, bot);
+                            break;
+
+                     case UserState.Complete:
+                            await handleMainMenu(ctx, bot, text);
+                            break;
+
+                     case UserState.InQueue:
+                            if (text === '❌ لغو جستجو') {
+                                   await leaveQueue(ctx);
+                            } else {
+                                   await ctx.reply('⏳ داری دنبال همصحبت می‌گردیم... برای لغو «❌ لغو جستجو» بزن.');
+                            }
+                            break;
+
+                     case UserState.InChat:
+                            await forwardChatMessage(ctx, bot);
+                            break;
+              }
+       };
 }
 
 // ══════════════════════════════════════════════════════════
 //  منوی اصلی
 // ══════════════════════════════════════════════════════════
 
-async function handleMainMenu(ctx: BotContext, text: string | null): Promise<void> {
+async function handleMainMenu(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+       text: string | null,
+): Promise<void> {
        switch (text) {
 
               case '🎲 چت تصادفی':
-                     // TODO: مرحله ۴
-                     await ctx.reply('🔧 چت تصادفی به زودی فعال می‌شه.');
+                     await joinRandomQueue(ctx, bot);
                      break;
 
               case '💬 چت مستقیم':
-                     // TODO: مرحله ۵
-                     await ctx.reply('🔧 چت مستقیم به زودی فعال می‌شه.');
+                     await startDirectChat(ctx);
                      break;
 
               case '👤 پروفایل من':
@@ -85,17 +130,15 @@ async function handleMainMenu(ctx: BotContext, text: string | null): Promise<voi
                      break;
 
               case '🪙 سکه‌هام':
-                     // TODO: مرحله ۶
-                     await ctx.reply('🔧 سیستم سکه به زودی فعال می‌شه.');
+                     await showCoinsPage(ctx);
                      break;
 
               case '🔗 دعوت دوستان':
-                     // TODO: مرحله ۷
-                     await ctx.reply('🔧 سیستم دعوت به زودی فعال می‌شه.');
+                     await showInvitePage(ctx);
                      break;
 
               case '⚙️ تنظیمات':
-                     await ctx.reply('🔧 تنظیمات به زودی اضافه می‌شه.');
+                     await showSettingsMenu(ctx);
                      break;
 
               default:
@@ -112,6 +155,8 @@ async function showProfile(ctx: BotContext): Promise<void> {
        const user = ctx.dbUser!;
 
        const genderText = user.gender === 'male' ? '👦 پسر' : '👧 دختر';
+       const interestText = user.interests.length > 0 ? user.interests.join('، ') : '—';
+
        const profileText =
               `👤 *پروفایل شما*\n\n` +
               `📛 نام: ${user.name ?? '—'}\n` +
@@ -119,6 +164,7 @@ async function showProfile(ctx: BotContext): Promise<void> {
               `🎂 سن: ${user.age ?? '—'}\n` +
               `📍 استان: ${user.province ?? '—'}\n` +
               `🏙️ شهر: ${user.city ?? '—'}\n` +
+              `🎯 علایق: ${interestText}\n` +
               `🪙 سکه: ${user.coins}\n` +
               `🔗 کد دعوت: \`${user.inviteCode}\``;
 

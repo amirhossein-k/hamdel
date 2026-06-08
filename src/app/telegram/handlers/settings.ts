@@ -1,0 +1,240 @@
+// src/app/telegram/handlers/settings.ts
+// ─── تنظیمات کاربر ───────────────────────────────────────
+//
+//  امکانات:
+//  - ویرایش نام
+//  - ویرایش سن
+//  - ویرایش استان/شهر
+//  - انتخاب علایق (multi-select با inline keyboard)
+//  - تنظیم فیلتر جستجو (محدوده سنی طرف مقابل)
+
+import { Markup } from 'telegraf';
+import type { BotContext } from '../context';
+import { INTERESTS, MIN_AGE, MAX_AGE } from '@/types/enums';
+import type { Interest } from '@/types/enums';
+import { IRAN_PROVINCES, isCityInProvince } from '@/types/iran';
+import type { IranProvince } from '@/types/iran';
+import { provinceKeyboard, cityKeyboard, mainMenuKeyboard } from '@/lib/keyboards';
+
+// ─── Inline keyboard منوی تنظیمات ────────────────────────
+
+export function settingsMenuKeyboard() {
+       return Markup.inlineKeyboard([
+              [Markup.button.callback('📛 ویرایش نام', 'settings:name')],
+              [Markup.button.callback('🎂 ویرایش سن', 'settings:age')],
+              [Markup.button.callback('📍 ویرایش استان/شهر', 'settings:province')],
+              [Markup.button.callback('🎯 علایق من', 'settings:interests')],
+       ]);
+}
+
+// ─── Inline keyboard علایق ───────────────────────────────
+
+export function interestsKeyboard(selected: string[]) {
+       const buttons = INTERESTS.map((interest) => {
+              const isSelected = selected.includes(interest);
+              return Markup.button.callback(
+                     isSelected ? `✅ ${interest}` : interest,
+                     `toggle_interest:${interest}`,
+              );
+       });
+
+       // دو تا در هر ردیف
+       const rows: ReturnType<typeof Markup.button.callback>[][] = [];
+       for (let i = 0; i < buttons.length; i += 2) {
+              rows.push(buttons.slice(i, i + 2));
+       }
+       rows.push([Markup.button.callback('💾 ذخیره', 'save_interests')]);
+       return Markup.inlineKeyboard(rows);
+}
+
+// ══════════════════════════════════════════════════════════
+//  نمایش منوی تنظیمات
+// ══════════════════════════════════════════════════════════
+
+export async function showSettingsMenu(ctx: BotContext): Promise<void> {
+       const user = ctx.dbUser!;
+       await ctx.reply(
+              `⚙️ *تنظیمات پروفایل*\n\n` +
+              `📛 نام: ${user.name ?? '—'}\n` +
+              `🎂 سن: ${user.age ?? '—'}\n` +
+              `📍 ${user.province ?? '—'} — ${user.city ?? '—'}\n` +
+              `🎯 علایق: ${user.interests.length > 0 ? user.interests.join('، ') : '—'}\n\n` +
+              `چه چیزی می‌خوای ویرایش کنی؟`,
+              { parse_mode: 'Markdown', ...settingsMenuKeyboard() },
+       );
+}
+
+// ══════════════════════════════════════════════════════════
+//  شروع ویرایش نام
+// ══════════════════════════════════════════════════════════
+
+export async function startEditName(ctx: BotContext): Promise<void> {
+       ctx.session.step = 'settings:name';
+       await ctx.answerCbQuery();
+       await ctx.reply(
+              `📛 نام فعلی: *${ctx.dbUser!.name}*\n\nنام جدید رو وارد کن:`,
+              { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
+       );
+}
+
+export async function handleEditName(ctx: BotContext): Promise<void> {
+       const text = ctx.message && 'text' in ctx.message ? ctx.message.text.trim() : null;
+
+       if (!text || text.length < 2 || text.length > 50) {
+              await ctx.reply('⚠️ نام باید بین ۲ تا ۵۰ کاراکتر باشه. دوباره وارد کن:');
+              return;
+       }
+
+       ctx.dbUser!.name = text;
+       await ctx.dbUser!.save();
+       ctx.session.step = undefined;
+
+       await ctx.reply(`✅ نام به *${text}* تغییر کرد.`, { parse_mode: 'Markdown', ...mainMenuKeyboard });
+}
+
+// ══════════════════════════════════════════════════════════
+//  شروع ویرایش سن
+// ══════════════════════════════════════════════════════════
+
+export async function startEditAge(ctx: BotContext): Promise<void> {
+       ctx.session.step = 'settings:age';
+       await ctx.answerCbQuery();
+       await ctx.reply(
+              `🎂 سن فعلی: *${ctx.dbUser!.age}*\n\nسن جدید رو وارد کن:`,
+              { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
+       );
+}
+
+export async function handleEditAge(ctx: BotContext): Promise<void> {
+       const text = ctx.message && 'text' in ctx.message ? ctx.message.text.trim() : null;
+       const age = Number(text);
+
+       if (!text || isNaN(age) || age < MIN_AGE || age > MAX_AGE) {
+              await ctx.reply(`⚠️ سن باید بین ${MIN_AGE} تا ${MAX_AGE} باشه:`);
+              return;
+       }
+
+       ctx.dbUser!.age = age;
+       await ctx.dbUser!.save();
+       ctx.session.step = undefined;
+
+       await ctx.reply(`✅ سن به *${age}* تغییر کرد.`, { parse_mode: 'Markdown', ...mainMenuKeyboard });
+}
+
+// ══════════════════════════════════════════════════════════
+//  شروع ویرایش استان
+// ══════════════════════════════════════════════════════════
+
+export async function startEditProvince(ctx: BotContext): Promise<void> {
+       ctx.session.step = 'settings:province';
+       await ctx.answerCbQuery();
+       await ctx.reply(
+              `📍 استان فعلی: *${ctx.dbUser!.province}*\n\nاستان جدید رو انتخاب کن:`,
+              { parse_mode: 'Markdown', ...provinceKeyboard },
+       );
+}
+
+export async function handleEditProvince(ctx: BotContext): Promise<void> {
+       const text = ctx.message && 'text' in ctx.message ? ctx.message.text.trim() : null;
+
+       if (!text || !(IRAN_PROVINCES as readonly string[]).includes(text)) {
+              await ctx.reply('⚠️ لطفاً استان رو از لیست انتخاب کن:', provinceKeyboard);
+              return;
+       }
+
+       ctx.dbUser!.province = text as IranProvince;
+       ctx.dbUser!.city = undefined;
+       await ctx.dbUser!.save();
+       ctx.session.step = 'settings:city';
+
+       await ctx.reply('🏙️ حالا شهرت رو انتخاب کن:', cityKeyboard(text as IranProvince));
+}
+
+export async function handleEditCity(ctx: BotContext): Promise<void> {
+       const user = ctx.dbUser!;
+       const text = ctx.message && 'text' in ctx.message ? ctx.message.text.trim() : null;
+
+       if (text === '🔙 تغییر استان') {
+              ctx.session.step = 'settings:province';
+              await ctx.reply('📍 استان رو انتخاب کن:', provinceKeyboard);
+              return;
+       }
+
+       if (!text || !user.province || !isCityInProvince(user.province, text)) {
+              await ctx.reply('⚠️ لطفاً شهر رو از لیست انتخاب کن:', cityKeyboard(user.province!));
+              return;
+       }
+
+       user.city = text;
+       await user.save();
+       ctx.session.step = undefined;
+
+       await ctx.reply(
+              `✅ موقعیت به *${user.province} — ${text}* تغییر کرد.`,
+              { parse_mode: 'Markdown', ...mainMenuKeyboard },
+       );
+}
+
+// ══════════════════════════════════════════════════════════
+//  نمایش و مدیریت علایق
+// ══════════════════════════════════════════════════════════
+
+export async function showInterests(ctx: BotContext): Promise<void> {
+       const user = ctx.dbUser!;
+       await ctx.answerCbQuery();
+       await ctx.editMessageText(
+              `🎯 *علایق من*\n\n` +
+              `علایقت رو انتخاب کن (می‌تونی چند تا انتخاب کنی):\n` +
+              `علایق انتخاب‌شده با ✅ مشخص‌اند.`,
+              {
+                     parse_mode: 'Markdown',
+                     ...interestsKeyboard(user.interests),
+              },
+       ).catch(async () => {
+              // اگر editMessageText ممکن نبود، پیام جدید ارسال کن
+              await ctx.reply(
+                     `🎯 *علایق من*\n\nعلایقت رو انتخاب کن:`,
+                     { parse_mode: 'Markdown', ...interestsKeyboard(user.interests) },
+              );
+       });
+}
+
+export async function toggleInterest(ctx: BotContext, interest: string): Promise<void> {
+       const user = ctx.dbUser!;
+
+       if (!INTERESTS.includes(interest as Interest)) {
+              await ctx.answerCbQuery('❌ علاقه نامعتبر');
+              return;
+       }
+
+       const idx = user.interests.indexOf(interest);
+       if (idx === -1) {
+              if (user.interests.length >= 5) {
+                     await ctx.answerCbQuery('⚠️ حداکثر ۵ علاقه می‌تونی انتخاب کنی.');
+                     return;
+              }
+              user.interests.push(interest);
+       } else {
+              user.interests.splice(idx, 1);
+       }
+
+       await user.save();
+       await ctx.answerCbQuery(idx === -1 ? `✅ ${interest} اضافه شد` : `❌ ${interest} حذف شد`);
+
+       // آپدیت keyboard
+       await ctx.editMessageReplyMarkup(interestsKeyboard(user.interests).reply_markup).catch(() => { });
+}
+
+export async function saveInterests(ctx: BotContext): Promise<void> {
+       const user = ctx.dbUser!;
+       await ctx.answerCbQuery('💾 علایق ذخیره شد!');
+
+       const interestText = user.interests.length > 0
+              ? user.interests.join('، ')
+              : 'هیچ علاقه‌ای انتخاب نشده';
+
+       await ctx.editMessageText(
+              `✅ *علایق ذخیره شد*\n\nعلایق شما: ${interestText}`,
+              { parse_mode: 'Markdown', ...settingsMenuKeyboard() },
+       ).catch(() => { });
+}
