@@ -191,5 +191,9 @@ async function showProfile(ctx: BotContext): Promise<void> {
               `🪙 سکه: ${user.coins}\n` +
               `🔗 کد دعوت: \`${user.inviteCode}\``;
 
-       await ctx.reply(profileText, { parse_mode: 'HTML' });
+       if (user.photo) {
+              await ctx.replyWithPhoto(user.photo, { caption: profileText, parse_mode: 'HTML' });
+       } else {
+              await ctx.reply(profileText, { parse_mode: 'HTML' });
+       }
 }

@@ -558,7 +558,7 @@ async function showPartnerProfile(ctx: BotContext, partnerId: number): Promise<v
        else if (mins < 1440) onlineStatus = `⚫ ${Math.floor(mins / 60)} ساعت پیش`;
        else onlineStatus = `⚫ ${Math.floor(mins / 1440)} روز پیش`;
 
-       await ctx.reply(
+       const profileText =
               `👤 <b>پروفایل همصحبت</b>\n\n` +
               `📛 نام: <b>${partner.name ?? '—'}</b>\n` +
               `${genderText}\n` +
@@ -566,7 +566,11 @@ async function showPartnerProfile(ctx: BotContext, partnerId: number): Promise<v
               `📍 استان: ${partner.province ?? '—'}\n` +
               `🏙️ شهر: ${partner.city ?? '—'}\n` +
               `🎯 علایق: ${interests}\n` +
-              `🕐 آخرین آنلاین: ${onlineStatus}`,
-              { parse_mode: 'HTML' },
-       );
+              `🕐 آخرین آنلاین: ${onlineStatus}`;
+
+       if (partner.photo) {
+              await ctx.replyWithPhoto(partner.photo, { caption: profileText, parse_mode: 'HTML' });
+       } else {
+              await ctx.reply(profileText, { parse_mode: 'HTML' });
+       }
 }

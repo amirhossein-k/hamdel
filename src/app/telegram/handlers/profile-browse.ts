@@ -212,12 +212,21 @@ async function showProfilesByGender(ctx: BotContext, gender: Gender): Promise<vo
 async function sendProfileCard(ctx: BotContext, u: any): Promise<void> {
        const icon = u.gender === 'male' ? '👦' : '👧';
        const text = `${icon} <b>${u.name ?? '—'}</b> | ${u.age ?? '—'} سال | ${u.city ?? u.province ?? '—'}`;
-       await ctx.reply(text, {
-              parse_mode: 'HTML',
-              ...Markup.inlineKeyboard([
-                     Markup.button.callback('👁 مشاهده پروفایل', `view_profile:${u.telegramId}`),
-              ]),
-       });
+       const kb = Markup.inlineKeyboard([
+              Markup.button.callback('👁 مشاهده پروفایل', `view_profile:${u.telegramId}`),
+       ]);
+       if (u.photo) {
+              await ctx.replyWithPhoto(u.photo, {
+                     caption: text,
+                     parse_mode: 'HTML',
+                     ...kb,
+              });
+       } else {
+              await ctx.reply(text, {
+                     parse_mode: 'HTML',
+                     ...kb,
+              });
+       }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -268,10 +277,19 @@ export async function handleViewProfileCallback(
                             ],
                      ];
 
-       await ctx.reply(profileText, {
-              parse_mode: 'HTML',
-              ...Markup.inlineKeyboard(buttons),
-       });
+       const inlineKb = Markup.inlineKeyboard(buttons);
+       if (target.photo) {
+              await ctx.replyWithPhoto(target.photo, {
+                     caption: profileText,
+                     parse_mode: 'HTML',
+                     ...inlineKb,
+              });
+       } else {
+              await ctx.reply(profileText, {
+                     parse_mode: 'HTML',
+                     ...inlineKb,
+              });
+       }
 }
 
 // ══════════════════════════════════════════════════════════
