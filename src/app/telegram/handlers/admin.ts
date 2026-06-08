@@ -87,10 +87,11 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
               `دستورات:\n` +
               `/stats — آمار کامل\n` +
               `/reports — بررسی گزارش‌ها\n` +
-              `/ban <telegramId> — بن کاربر\n` +
-              `/unban <telegramId> — آنبن کاربر\n` +
-              `/warn <telegramId> — اخطار\n` +
-              `/userinfo <telegramId> — اطلاعات کاربر`,
+              `/ban &lt;telegramId&gt; — بن کاربر\n` +
+              `/unban &lt;telegramId&gt; — آنبن کاربر\n` +
+              `/warn &lt;telegramId&gt; — اخطار\n` +
+              `/userinfo &lt;telegramId&gt; — اطلاعات کاربر\n` +
+              `/givecoin &lt;telegramId&gt; &lt;مقدار&gt; — اهدای سکه`,
               { parse_mode: 'HTML' },
        );
 }
@@ -191,7 +192,7 @@ export async function banHandler(ctx: BotContext, bot: Telegraf<BotContext>): Pr
        const parts = text.split(' ');
 
        if (parts.length < 2) {
-              await ctx.reply('استفاده: /ban <telegramId> [دلیل]');
+              await ctx.reply('استفاده: /ban &lt;telegramId&gt; [دلیل]', { parse_mode: 'HTML' });
               return;
        }
 
@@ -240,7 +241,7 @@ export async function unbanHandler(ctx: BotContext, bot: Telegraf<BotContext>): 
        const targetId = Number(text.split(' ')[1]);
 
        if (isNaN(targetId)) {
-              await ctx.reply('استفاده: /unban <telegramId>');
+              await ctx.reply('استفاده: /unban &lt;telegramId&gt;', { parse_mode: 'HTML' });
               return;
        }
 
@@ -276,7 +277,7 @@ export async function warnHandler(ctx: BotContext, bot: Telegraf<BotContext>): P
        const reason = parts.slice(2).join(' ') || 'رفتار نامناسب';
 
        if (isNaN(targetId)) {
-              await ctx.reply('استفاده: /warn <telegramId> [دلیل]');
+              await ctx.reply('استفاده: /warn &lt;telegramId&gt; [دلیل]', { parse_mode: 'HTML' });
               return;
        }
 
@@ -318,7 +319,7 @@ export async function userInfoHandler(ctx: BotContext): Promise<void> {
        const targetId = Number(text.split(' ')[1]);
 
        if (isNaN(targetId)) {
-              await ctx.reply('استفاده: /userinfo <telegramId>');
+              await ctx.reply('استفاده: /userinfo &lt;telegramId&gt;', { parse_mode: 'HTML' });
               return;
        }
 
