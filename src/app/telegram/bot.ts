@@ -37,10 +37,10 @@ const bot = new Telegraf<BotContext>(process.env.BOT_TOKEN!);
 bot.use(
        session({
               defaultSession: () => ({
-                     step: undefined,
+                     step: '',
               }),
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-       }) as any,
+       }) as any
 );
 
 bot.use(authMiddleware);
