@@ -10,7 +10,7 @@
 import { MiddlewareFn } from 'telegraf';
 import { connectDB } from '@/lib/mongodb';
 import { UserModel } from '@/models/user.model';
-import { UserState } from '@/types/enums';
+import { UserState, Gender } from '@/types/enums';
 import type { BotContext } from '../context';
 import { nanoid } from 'nanoid';
 
@@ -64,7 +64,7 @@ export const authMiddleware: MiddlewareFn<BotContext> = async (ctx, next) => {
                             warnings: 0,
                             profileComplete: isAdminUser,
                             ...(isAdminUser && {
-                                   gender: 'male',
+                                   gender: Gender.Male,
                                    age: 30,
                                    province: 'تهران',
                                    city: 'تهران',
