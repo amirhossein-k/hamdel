@@ -4,22 +4,24 @@
 //  دسترسی: فقط ADMIN_TELEGRAM_ID
 //
 //  دستورات:
-//  /admin           — منوی اصلی پنل
-//  /stats           — آمار کلی ربات
-//  /reports         — لیست گزارش‌های pending
-//  /ban <id>        — بن کردن کاربر
-//  /unban <id>      — آنبن کردن
-//  /warn <id>       — اخطار به کاربر
-//  /userinfo <id>   — اطلاعات کاربر
-//  
+//  /admin                    — منوی اصلی پنل
+//  /stats                    — آمار کلی ربات
+//  /reports                  — لیست گزارش‌های pending
+//  /ban <id>                 — بن کردن کاربر
+//  /unban <id>               — آنبن کردن
+//  /warn <id>                — اخطار به کاربر
+//  /userinfo <id>            — اطلاعات کاربر
+//  /givecoin <id> <amount>   — اهدای سکه به کاربر
+//
 //  Callback:
 //  admin_report:<reportId>:warn|ban|dismiss  — تصمیم روی گزارش
 
 import { Markup, Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { ReportStatus, AUTO_BAN_THRESHOLD, Gender, UserState } from '@/types/enums';
+import { ReportStatus, AUTO_BAN_THRESHOLD, Gender, UserState, CoinChangeReason } from '@/types/enums';
 import { ReportModel } from '@/models/queue.model';
 import { UserModel } from '@/models/user.model';
+import { CoinLogModel } from '@/models/coin.model';
 import { mainMenuKeyboard } from '@/lib/keyboards';
 
 // ─── بررسی دسترسی ادمین ──────────────────────────────────
@@ -65,7 +67,8 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
               `/ban <telegramId> — بن کاربر\n` +
               `/unban <telegramId> — آنبن کاربر\n` +
               `/warn <telegramId> — اخطار\n` +
-              `/userinfo <telegramId> — اطلاعات کاربر`,
+              `/userinfo <telegramId> — اطلاعات کاربر\n` +
+              `/givecoin <telegramId> <مقدار> — اهدای سکه`,
               { parse_mode: 'Markdown' },
        );
 }
@@ -325,6 +328,113 @@ export async function userInfoHandler(ctx: BotContext): Promise<void> {
               `🕒 آخرین فعالیت: ${user.lastActive.toLocaleString('fa-IR')}`,
               { parse_mode: 'Markdown' },
        );
+}
+
+
+// ══════════════════════════════════════════════════════════
+//  /givecoin <id> <amount> — اهدای سکه به کاربر توسط ادمین
+// ══════════════════════════════════════════════════════════
+
+export async function giveCoinHandler(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+): Promise<void> {
+       if (!isAdmin(ctx)) return;
+
+       const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+       const parts = text.trim().split(/\s+/);
+
+       if (parts.length < 3) {
+              await ctx.reply(
+                     '❌ فرمت نادرست.\n\n' +
+                     'استفاده صحیح:\n' +
+                     '`/givecoin <telegramId> <مقدار>`\n\n' +
+                     'مثال: `/givecoin 123456789 50`',
+                     { parse_mode: 'Markdown' },
+              );
+              return;
+       }
+
+       const targetId = Number(parts[1]);
+       const amount = Number(parts[2]);
+
+       if (!Number.isInteger(targetId) || targetId <= 0) {
+              await ctx.reply('❌ telegramId نامعتبر است.');
+              return;
+       }
+
+       if (!Number.isInteger(amount) || amount === 0) {
+              await ctx.reply(
+                     '❌ مقدار سکه باید یک عدد صحیح غیر صفر باشد.\n' +
+                     'برای کسر سکه از عدد منفی استفاده کنید (مثال: `-10`).',
+              );
+              return;
+       }
+
+       const user = await UserModel.findByTelegramId(targetId);
+       if (!user) {
+              await ctx.reply(`❌ کاربری با آیدی \`${targetId}\` پیدا نشد.`, {
+                     parse_mode: 'Markdown',
+              });
+              return;
+       }
+
+       if (user.isBanned) {
+              await ctx.reply(`⚠️ کاربر \`${targetId}\` بن است. آیا ادامه می‌دهید؟`, {
+                     parse_mode: 'Markdown',
+              });
+              // ادامه می‌دهیم — ادمین آگاه است
+       }
+
+       const balanceBefore = user.coins;
+       const balanceAfter = Math.max(0, balanceBefore + amount);
+
+       // کسر بیشتر از موجودی مجاز نیست
+       if (amount < 0 && balanceBefore + amount < 0) {
+              await ctx.reply(
+                     `❌ موجودی کاربر (${balanceBefore} سکه) کمتر از مقدار کسر (${Math.abs(amount)}) است.\n` +
+                     `حداکثر می‌توان \`/givecoin ${targetId} -${balanceBefore}\` زد.`,
+                     { parse_mode: 'Markdown' },
+              );
+              return;
+       }
+
+       // ذخیره در دیتابیس (atomic update)
+       user.coins = balanceAfter;
+       await user.save();
+
+       // ثبت در لاگ سکه
+       await CoinLogModel.record(
+              targetId,
+              amount,
+              CoinChangeReason.AdminGift,
+              balanceAfter,
+              String(ctx.from!.id),
+       );
+
+       const direction = amount > 0 ? '🎁 اهدا' : '➖ کسر';
+       const amountText = amount > 0 ? `+${amount}` : String(amount);
+
+       // پیام تأیید به ادمین
+       await ctx.reply(
+              `✅ *عملیات موفق*\n\n` +
+              `👤 کاربر: \`${targetId}\` (${user.name ?? '—'})\n` +
+              `${direction}: *${amountText} سکه*\n` +
+              `📊 موجودی قبل: ${balanceBefore} → بعد: ${balanceAfter}`,
+              { parse_mode: 'Markdown' },
+       );
+
+       // اطلاع‌رسانی به کاربر
+       const userMsg =
+              amount > 0
+                     ? `🎁 *${amount} سکه هدیه دریافت کردی!*\n\nموجودی فعلی: ${balanceAfter} سکه 🪙`
+                     : `📢 *اطلاعیه حساب*\n\n${Math.abs(amount)} سکه از حسابت کسر شد.\nموجودی فعلی: ${balanceAfter} سکه 🪙`;
+
+       await bot.telegram
+              .sendMessage(targetId, userMsg, { parse_mode: 'Markdown' })
+              .catch(() => {
+                     // کاربر ربات را بلاک کرده — نادیده می‌گیریم
+              });
 }
 
 // ══════════════════════════════════════════════════════════

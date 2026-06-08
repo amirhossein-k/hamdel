@@ -66,6 +66,7 @@ export enum CoinChangeReason {
        InviteReward = 'invite_reward',
        ChatFemale = 'chat_female',
        Refund = 'refund',
+       AdminGift = 'admin_gift',   // اهدای سکه توسط ادمین
 }
 
 // ─── ثابت‌های کسب‌وکار ───────────────────────

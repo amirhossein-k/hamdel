@@ -17,6 +17,7 @@ import {
        handleEditProvince,
        handleEditCity,
 } from './settings';
+import { isAdmin } from './admin';
 
 // ─── متن پیام ────────────────────────────────────────────
 
@@ -37,6 +38,11 @@ export function makeMessageRouter(bot: Telegraf<BotContext>) {
                      await ctx.reply('❌ خطا. لطفاً /start بزن.');
                      return;
               }
+
+              // ─── ادمین از روتر عادی عبور می‌کند ─────────────────
+              // دستورات ادمین توسط bot.command ثبت شده‌اند.
+              // پیام‌های متنی ادمین نباید وارد فلوی کاربر عادی شوند.
+              if (isAdmin(ctx)) return;
 
               const text = getText(ctx);
 

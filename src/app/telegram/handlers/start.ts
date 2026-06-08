@@ -8,9 +8,16 @@ import type { BotContext } from '../context';
 import { UserState } from '@/types/enums';
 import { askGender, handleRegistrationStep } from './registration';
 import { mainMenuKeyboard } from '@/lib/keyboards';
+import { adminMenuHandler, isAdmin } from './admin';
 
 export async function startHandler(ctx: BotContext): Promise<void> {
   const user = ctx.dbUser!;
+
+  // ─── ادمین را مستقیم به پنل می‌فرستیم ─────────────────
+  if (isAdmin(ctx)) {
+    await adminMenuHandler(ctx);
+    return;
+  }
 
   switch (user.state) {
 

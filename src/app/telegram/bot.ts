@@ -16,6 +16,7 @@ import {
        unbanHandler,
        warnHandler,
        userInfoHandler,
+       giveCoinHandler,
        handleReportAction,
        isAdmin,
 } from './handlers/admin';
@@ -59,6 +60,7 @@ bot.command('ban', (ctx) => banHandler(ctx, bot));
 bot.command('unban', (ctx) => unbanHandler(ctx, bot));
 bot.command('warn', (ctx) => warnHandler(ctx, bot));
 bot.command('userinfo', (ctx) => userInfoHandler(ctx));
+bot.command('givecoin', (ctx) => giveCoinHandler(ctx, bot));
 
 // ─── Callback Query ها ───────────────────────────────────
 

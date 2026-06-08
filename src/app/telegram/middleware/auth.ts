@@ -46,24 +46,37 @@ export const authMiddleware: MiddlewareFn<BotContext> = async (ctx, next) => {
                             if (inviter) invitedBy = inviter.telegramId;
                      }
 
+                     // ─── ادمین → مستقیم Complete، بدون ثبت‌نام ──────────────
+                     const adminTelegramId = Number(process.env.ADMIN_TELEGRAM_ID);
+                     const isAdminUser = !!adminTelegramId && telegramId === adminTelegramId;
+
                      user = await UserModel.create({
                             telegramId,
                             username: ctx.from.username,
                             name: ctx.from.first_name,
                             inviteCode: generateInviteCode(),
                             invitedBy,
-                            state: UserState.Start,
-                            coins: 0,
+                            state: isAdminUser ? UserState.Complete : UserState.Start,
+                            coins: isAdminUser ? 999_999 : 0,
                             interests: [],
                             invitedUsers: [],
                             isBanned: false,
                             warnings: 0,
-                            profileComplete: false,
+                            profileComplete: isAdminUser,
+                            ...(isAdminUser && {
+                                   gender: 'male',
+                                   age: 30,
+                                   province: 'تهران',
+                                   city: 'تهران',
+                            }),
                      });
               } else {
                      // ─── کاربر موجود ─────────────────────────────────────
-                     // بررسی بن
-                     if (user.isBanned) {
+                     // بررسی بن — ادمین هرگز بن نمی‌شود
+                     const adminTelegramId = Number(process.env.ADMIN_TELEGRAM_ID);
+                     const isAdminUser = !!adminTelegramId && telegramId === adminTelegramId;
+
+                     if (!isAdminUser && user.isBanned) {
                             await ctx.reply(
                                    `🚫 حساب شما به دلیل زیر مسدود شده است:\n${user.banReason ?? 'نقض قوانین'}\n\nبرای اعتراض با پشتیبانی تماس بگیرید.`
                             );
