@@ -48,7 +48,7 @@ export async function startDirectChat(ctx: BotContext): Promise<void> {
               '💬 *چت مستقیم*\n\n' +
               'یوزرنیم تلگرام یا کد دعوت طرف مقابل رو وارد کن:\n\n' +
               '_(مثال: @username یا کد دعوت مثل ABC12345)_',
-              { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
+              { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } },
        );
 }
 
@@ -128,16 +128,16 @@ export async function handleDirectChatSearch(
 
        // پیام تأیید به فرستنده
        await ctx.reply(
-              `✅ درخواست چت به *${target.name}* فرستاده شد.\nمنتظر جواب بمون...`,
-              { parse_mode: 'Markdown', ...mainMenuKeyboard },
+              `✅ درخواست چت به <b>${target.name}</b> فرستاده شد.\nمنتظر جواب بمون...`,
+              { parse_mode: 'HTML', ...mainMenuKeyboard },
        );
 
        // پیام درخواست به گیرنده
        try {
               await bot.telegram.sendMessage(
                      target.telegramId,
-                     `💬 *${user.name}* می‌خواد باهات چت کنه!\n\nقبول می‌کنی؟`,
-                     { parse_mode: 'Markdown', ...requestKeyboard(user.telegramId) },
+                     `💬 <b>${user.name}</b> می‌خواد باهات چت کنه!\n\nقبول می‌کنی؟`,
+                     { parse_mode: 'HTML', ...requestKeyboard(user.telegramId) },
               );
        } catch {
               await ctx.reply('⚠️ پیام به طرف مقابل ارسال نشد. ممکنه ربات رو بلاک کرده باشه.');
@@ -198,8 +198,8 @@ export async function acceptChatRequest(
        const startMsg = '✅ درخواست چت قبول شد! بریم چت کنیم 🎉\n\n⚠️ برای پایان «🔚 پایان چت» رو بزن.';
 
        // ویرایش پیام درخواست (حذف دکمه‌ها)
-       await ctx.editMessageText(`💬 درخواست چت از *${requester?.name ?? 'کاربر'}* ✅ قبول شد.`, {
-              parse_mode: 'Markdown',
+       await ctx.editMessageText(`💬 درخواست چت از <b>${requester?.name ?? 'کاربر'}</b> ✅ قبول شد.`, {
+              parse_mode: 'HTML',
        }).catch(() => { });
 
        await ctx.reply(startMsg, inChatKeyboard);
@@ -243,8 +243,8 @@ export async function rejectChatRequest(
        try {
               await bot.telegram.sendMessage(
                      fromId,
-                     `❌ *${user.name}* درخواست چتت رو رد کرد.`,
-                     { parse_mode: 'Markdown' },
+                     `❌ <b>${user.name}</b> درخواست چتت رو رد کرد.`,
+                     { parse_mode: 'HTML' },
               );
        } catch {
               // طرف مقابل ربات را بلاک کرده

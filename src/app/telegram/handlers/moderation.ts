@@ -32,11 +32,11 @@ export async function forwardPhotoToAdmin(
        try {
               await bot.telegram.sendPhoto(adminId, fileId, {
                      caption:
-                            `📸 *عکس ارسال‌شده در چت*\n` +
+                            `📸 <b>عکس ارسال‌شده در چت</b>\n` +
                             `👤 فرستنده: \`${senderId}\`\n` +
                             `🆔 چت: \`${chatId}\`` +
                             (caption ? `\n📝 کپشن: ${caption}` : ''),
-                     parse_mode: 'Markdown',
+                     parse_mode: 'HTML',
               });
 
               // علامت‌گذاری adminCopySent در پیام
@@ -78,8 +78,8 @@ export async function checkAndAutoBan(
               if (adminId) {
                      await bot.telegram.sendMessage(
                             adminId,
-                            `🚫 *بن خودکار*\n\nکاربر \`${reportedId}\` به دلیل ${reportCount} گزارش بن شد.`,
-                            { parse_mode: 'Markdown' },
+                            `🚫 <b>بن خودکار</b>\n\nکاربر \`${reportedId}\` به دلیل ${reportCount} گزارش بن شد.`,
+                            { parse_mode: 'HTML' },
                      ).catch(() => { });
               }
 
@@ -93,8 +93,8 @@ export async function checkAndAutoBan(
 
               await bot.telegram.sendMessage(
                      reportedId,
-                     `⚠️ *اخطار سیستم*\n\nرفتارت گزارش شده. در صورت ادامه، حسابت مسدود خواهد شد.`,
-                     { parse_mode: 'Markdown' },
+                     `⚠️ <b>اخطار سیستم</b>\n\nرفتارت گزارش شده. در صورت ادامه، حسابت مسدود خواهد شد.`,
+                     { parse_mode: 'HTML' },
               ).catch(() => { });
 
               return { autoBanned: false, autoWarned: true };

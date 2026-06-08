@@ -17,7 +17,6 @@ import {
        handleEditProvince,
        handleEditCity,
 } from './settings';
-import { isAdmin } from './admin';
 
 // ─── متن پیام ────────────────────────────────────────────
 
@@ -36,20 +35,6 @@ export function makeMessageRouter(bot: Telegraf<BotContext>) {
 
               if (!user) {
                      await ctx.reply('❌ خطا. لطفاً /start بزن.');
-                     return;
-              }
-
-              // ─── ادمین از روتر کاربر عادی خارج می‌شود ────────────
-              // دستورات /admin /ban /stats ... توسط bot.command پردازش می‌شوند.
-              // پیام‌های متنی ادمین (غیر دستور) نباید وارد فلوی ثبت‌نام شوند.
-              if (isAdmin(ctx)) {
-                     const msgText = getText(ctx) ?? '';
-                     // اگر دستور بود (/) telegraf خودش هندل کرده — اینجا نمی‌رسد
-                     // اگر متن آزاد بود، منوی ادمین را نشان بده
-                     if (!msgText.startsWith('/')) {
-                            const { adminMenuHandler } = await import('./admin');
-                            await adminMenuHandler(ctx);
-                     }
                      return;
               }
 
@@ -172,7 +157,7 @@ async function showProfile(ctx: BotContext): Promise<void> {
        const interestText = user.interests.length > 0 ? user.interests.join('، ') : '—';
 
        const profileText =
-              `👤 *پروفایل شما*\n\n` +
+              `👤 <b>پروفایل شما</b>\n\n` +
               `📛 نام: ${user.name ?? '—'}\n` +
               `${genderText}\n` +
               `🎂 سن: ${user.age ?? '—'}\n` +
@@ -182,5 +167,5 @@ async function showProfile(ctx: BotContext): Promise<void> {
               `🪙 سکه: ${user.coins}\n` +
               `🔗 کد دعوت: \`${user.inviteCode}\``;
 
-       await ctx.reply(profileText, { parse_mode: 'Markdown' });
+       await ctx.reply(profileText, { parse_mode: 'HTML' });
 }

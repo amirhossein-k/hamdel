@@ -63,7 +63,6 @@ export async function showCoinsPage(ctx: BotContext): Promise<void> {
                      [CoinChangeReason.InviteReward]: '🎁 دعوت دوست',
                      [CoinChangeReason.ChatFemale]: '💬 چت',
                      [CoinChangeReason.Refund]: '↩️ بازگشت',
-                     [CoinChangeReason.AdminGift]: '🎁 هدیه ادمین',
               };
               for (const log of logs) {
                      const sign = log.change > 0 ? '+' : '';
@@ -73,11 +72,11 @@ export async function showCoinsPage(ctx: BotContext): Promise<void> {
        }
 
        await ctx.reply(
-              `🪙 *موجودی سکه شما*\n\n` +
-              `💰 موجودی فعلی: *${user.coins} سکه*\n` +
+              `🪙 <b>موجودی سکه شما</b>\n\n` +
+              `💰 موجودی فعلی: <b>${user.coins} سکه</b>\n` +
               `\n📦 برای خرید سکه یکی از پکیج‌های زیر رو انتخاب کن:` +
               historyText,
-              { parse_mode: 'Markdown', ...coinPackagesKeyboard() },
+              { parse_mode: 'HTML', ...coinPackagesKeyboard() },
        );
 }
 
@@ -137,11 +136,11 @@ export async function initiatePurchase(
                             await ctx.answerCbQuery();
                      } await ctx.editMessageText(
                             `💳 *پرداخت ${pkg.coins} سکه*\n\n` +
-                            `مبلغ: *${priceFormatted} تومان*\n\n` +
+                            `مبلغ: <b>${priceFormatted} تومان</b>\n\n` +
                             `روی دکمه زیر کلیک کن و پرداخت رو انجام بده.\n` +
                             `بعد از پرداخت موفق، سکه‌ها به حسابت اضافه میشه ✅`,
                             {
-                                   parse_mode: 'Markdown',
+                                   parse_mode: 'HTML',
                                    ...Markup.inlineKeyboard([
                                           [Markup.button.url('💳 پرداخت آنلاین', payUrl)],
                                           [Markup.button.callback('🔙 بازگشت', 'show_coins')],
@@ -227,10 +226,10 @@ export async function verifyAndCreditCoins(
                             // اطلاع به کاربر در تلگرام
                             await telegram.sendMessage(
                                    user.telegramId,
-                                   `✅ *پرداخت موفق!*\n\n` +
+                                   `✅ <b>پرداخت موفق!</b>\n\n` +
                                    `🪙 ${transaction.coins} سکه به حسابت اضافه شد.\n` +
                                    `💰 موجودی فعلی: ${user.coins} سکه`,
-                                   { parse_mode: 'Markdown', ...mainMenuKeyboard },
+                                   { parse_mode: 'HTML', ...mainMenuKeyboard },
                             ).catch(() => { });
                      }
 

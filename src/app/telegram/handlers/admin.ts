@@ -4,24 +4,22 @@
 //  دسترسی: فقط ADMIN_TELEGRAM_ID
 //
 //  دستورات:
-//  /admin                    — منوی اصلی پنل
-//  /stats                    — آمار کلی ربات
-//  /reports                  — لیست گزارش‌های pending
-//  /ban <id>                 — بن کردن کاربر
-//  /unban <id>               — آنبن کردن
-//  /warn <id>                — اخطار به کاربر
-//  /userinfo <id>            — اطلاعات کاربر
-//  /givecoin <id> <amount>   — اهدای سکه به کاربر
-//
+//  /admin           — منوی اصلی پنل
+//  /stats           — آمار کلی ربات
+//  /reports         — لیست گزارش‌های pending
+//  /ban <id>        — بن کردن کاربر
+//  /unban <id>      — آنبن کردن
+//  /warn <id>       — اخطار به کاربر
+//  /userinfo <id>   — اطلاعات کاربر
+//  
 //  Callback:
 //  admin_report:<reportId>:warn|ban|dismiss  — تصمیم روی گزارش
 
 import { Markup, Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { ReportStatus, AUTO_BAN_THRESHOLD, Gender, UserState, CoinChangeReason } from '@/types/enums';
+import { ReportStatus, AUTO_BAN_THRESHOLD, Gender, UserState } from '@/types/enums';
 import { ReportModel } from '@/models/queue.model';
 import { UserModel } from '@/models/user.model';
-import { CoinLogModel } from '@/models/coin.model';
 import { mainMenuKeyboard } from '@/lib/keyboards';
 
 // ─── بررسی دسترسی ادمین ──────────────────────────────────
@@ -57,7 +55,7 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
        ]);
 
        await ctx.reply(
-              `🛡️ *پنل ادمین هم‌دل*\n\n` +
+              `🛡️ <b>پنل ادمین هم‌دل</b>\n\n` +
               `👥 کاربران: ${userCount}\n` +
               `🚨 گزارش‌های pending: ${pendingReports}\n` +
               `💬 چت‌های فعال: ${activeChats}\n\n` +
@@ -67,9 +65,8 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
               `/ban <telegramId> — بن کاربر\n` +
               `/unban <telegramId> — آنبن کاربر\n` +
               `/warn <telegramId> — اخطار\n` +
-              `/userinfo <telegramId> — اطلاعات کاربر\n` +
-              `/givecoin <telegramId> <مقدار> — اهدای سکه`,
-              { parse_mode: 'Markdown' },
+              `/userinfo <telegramId> — اطلاعات کاربر`,
+              { parse_mode: 'HTML' },
        );
 }
 
@@ -105,17 +102,17 @@ export async function statsHandler(ctx: BotContext): Promise<void> {
        ]);
 
        await ctx.reply(
-              `📊 *آمار ربات هم‌دل*\n\n` +
-              `👥 *کاربران:*\n` +
+              `📊 <b>آمار ربات هم‌دل</b>\n\n` +
+              `👥 <b>کاربران:</b>\n` +
               `• کل: ${totalUsers}\n` +
               `• جدید (۲۴ ساعت): ${newUsersToday}\n` +
               `• جدید (۷ روز): ${newUsersWeek}\n` +
               `• بن‌شده: ${bannedUsers}\n` +
               `• پسر: ${maleUsers} | دختر: ${femaleUsers}\n\n` +
-              `🚨 *گزارش‌ها:*\n` +
+              `🚨 <b>گزارش‌ها:</b>\n` +
               `• در انتظار بررسی: ${pendingReports}\n` +
               `• کل گزارش‌ها: ${totalReports}`,
-              { parse_mode: 'Markdown' },
+              { parse_mode: 'HTML' },
        );
 }
 
@@ -133,22 +130,22 @@ export async function reportsHandler(ctx: BotContext): Promise<void> {
               return;
        }
 
-       await ctx.reply(`🚨 *${reports.length} گزارش در انتظار بررسی:*`, { parse_mode: 'Markdown' });
+       await ctx.reply(`🚨 <b>${reports.length} گزارش در انتظار بررسی:</b>`, { parse_mode: 'HTML' });
 
        for (const report of reports.slice(0, 10)) {
               // تعداد گزارش‌های قبلی علیه همین کاربر
               const prevCount = await ReportModel.countAgainstUser(report.reportedId);
 
               const reportText =
-                     `🆔 گزارش: \`${report._id}\`\n` +
-                     `👤 گزارش‌دهنده: \`${report.reporterId}\`\n` +
-                     `🎯 گزارش‌شده: \`${report.reportedId}\`\n` +
+                     `🆔 گزارش: <code>${report._id}</code>\n` +
+                     `👤 گزارش‌دهنده: <code>${report.reporterId}</code>\n` +
+                     `🎯 گزارش‌شده: <code>${report.reportedId}</code>\n` +
                      `📋 دلیل: ${report.reason}\n` +
                      `📅 زمان: ${report.createdAt.toLocaleString('fa-IR')}\n` +
                      `🔢 تعداد گزارش علیه این کاربر: ${prevCount}`;
 
               await ctx.reply(reportText, {
-                     parse_mode: 'Markdown',
+                     parse_mode: 'HTML',
                      ...reportActionKeyboard(String(report._id)),
               });
        }
@@ -196,8 +193,8 @@ export async function banHandler(ctx: BotContext, bot: Telegraf<BotContext>): Pr
        user.banReason = reason;
        await user.save();
 
-       await ctx.reply(`✅ کاربر \`${targetId}\` (${user.name}) بن شد.\nدلیل: ${reason}`, {
-              parse_mode: 'Markdown',
+       await ctx.reply(`✅ کاربر <code>${targetId}</code> (${user.name}) بن شد.\nدلیل: ${reason}`, {
+              parse_mode: 'HTML',
        });
 
        // اطلاع به کاربر
@@ -232,7 +229,7 @@ export async function unbanHandler(ctx: BotContext, bot: Telegraf<BotContext>): 
        user.banReason = undefined;
        await user.save();
 
-       await ctx.reply(`✅ کاربر \`${targetId}\` (${user.name}) آنبن شد.`, { parse_mode: 'Markdown' });
+       await ctx.reply(`✅ کاربر <code>${targetId}</code> (${user.name}) آنبن شد.`, { parse_mode: 'HTML' });
 
        await bot.telegram.sendMessage(
               targetId,
@@ -273,16 +270,16 @@ export async function warnHandler(ctx: BotContext, bot: Telegraf<BotContext>): P
        await user.save();
 
        await ctx.reply(
-              `⚠️ اخطار ${user.warnings} به کاربر \`${targetId}\` (${user.name}) ثبت شد.` +
+              `⚠️ اخطار ${user.warnings} به کاربر <code>${targetId}</code> (${user.name}) ثبت شد.` +
               (shouldBan ? `\n\n🚫 بن خودکار اعمال شد (${user.warnings} اخطار).` : ''),
-              { parse_mode: 'Markdown' },
+              { parse_mode: 'HTML' },
        );
 
        const warnMsg = shouldBan
               ? `🚫 حساب شما به دلیل اخطارهای مکرر مسدود شد.`
-              : `⚠️ *اخطار ${user.warnings}*\n\nرفتار نامناسب گزارش شده: ${reason}\n\nدر صورت تکرار، حساب شما مسدود خواهد شد.`;
+              : `⚠️ <b>اخطار ${user.warnings}</b>\n\nرفتار نامناسب گزارش شده: ${reason}\n\nدر صورت تکرار، حساب شما مسدود خواهد شد.`;
 
-       await bot.telegram.sendMessage(targetId, warnMsg, { parse_mode: 'Markdown' }).catch(() => { });
+       await bot.telegram.sendMessage(targetId, warnMsg, { parse_mode: 'HTML' }).catch(() => { });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -312,8 +309,8 @@ export async function userInfoHandler(ctx: BotContext): Promise<void> {
 
        const statusEmoji = user.isBanned ? '🚫' : '✅';
        await ctx.reply(
-              `👤 *اطلاعات کاربر*\n\n` +
-              `🆔 Telegram ID: \`${user.telegramId}\`\n` +
+              `👤 <b>اطلاعات کاربر</b>\n\n` +
+              `🆔 Telegram ID: <code>${user.telegramId}</code>\n` +
               `📛 نام: ${user.name ?? '—'}\n` +
               `👤 Username: @${user.username ?? '—'}\n` +
               `${user.gender === 'male' ? '👦' : '👧'} جنسیت: ${user.gender === 'male' ? 'پسر' : 'دختر'}\n` +
@@ -326,115 +323,8 @@ export async function userInfoHandler(ctx: BotContext): Promise<void> {
               `${statusEmoji} وضعیت: ${user.isBanned ? `بن شده — ${user.banReason ?? ''}` : 'فعال'}\n` +
               `📅 ثبت‌نام: ${user.registeredAt.toLocaleDateString('fa-IR')}\n` +
               `🕒 آخرین فعالیت: ${user.lastActive.toLocaleString('fa-IR')}`,
-              { parse_mode: 'Markdown' },
+              { parse_mode: 'HTML' },
        );
-}
-
-
-// ══════════════════════════════════════════════════════════
-//  /givecoin <id> <amount> — اهدای سکه به کاربر توسط ادمین
-// ══════════════════════════════════════════════════════════
-
-export async function giveCoinHandler(
-       ctx: BotContext,
-       bot: Telegraf<BotContext>,
-): Promise<void> {
-       if (!isAdmin(ctx)) return;
-
-       const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
-       const parts = text.trim().split(/\s+/);
-
-       if (parts.length < 3) {
-              await ctx.reply(
-                     '❌ فرمت نادرست.\n\n' +
-                     'استفاده صحیح:\n' +
-                     '`/givecoin <telegramId> <مقدار>`\n\n' +
-                     'مثال: `/givecoin 123456789 50`',
-                     { parse_mode: 'Markdown' },
-              );
-              return;
-       }
-
-       const targetId = Number(parts[1]);
-       const amount = Number(parts[2]);
-
-       if (!Number.isInteger(targetId) || targetId <= 0) {
-              await ctx.reply('❌ telegramId نامعتبر است.');
-              return;
-       }
-
-       if (!Number.isInteger(amount) || amount === 0) {
-              await ctx.reply(
-                     '❌ مقدار سکه باید یک عدد صحیح غیر صفر باشد.\n' +
-                     'برای کسر سکه از عدد منفی استفاده کنید (مثال: `-10`).',
-              );
-              return;
-       }
-
-       const user = await UserModel.findByTelegramId(targetId);
-       if (!user) {
-              await ctx.reply(`❌ کاربری با آیدی \`${targetId}\` پیدا نشد.`, {
-                     parse_mode: 'Markdown',
-              });
-              return;
-       }
-
-       if (user.isBanned) {
-              await ctx.reply(`⚠️ کاربر \`${targetId}\` بن است. آیا ادامه می‌دهید؟`, {
-                     parse_mode: 'Markdown',
-              });
-              // ادامه می‌دهیم — ادمین آگاه است
-       }
-
-       const balanceBefore = user.coins;
-       const balanceAfter = Math.max(0, balanceBefore + amount);
-
-       // کسر بیشتر از موجودی مجاز نیست
-       if (amount < 0 && balanceBefore + amount < 0) {
-              await ctx.reply(
-                     `❌ موجودی کاربر (${balanceBefore} سکه) کمتر از مقدار کسر (${Math.abs(amount)}) است.\n` +
-                     `حداکثر می‌توان \`/givecoin ${targetId} -${balanceBefore}\` زد.`,
-                     { parse_mode: 'Markdown' },
-              );
-              return;
-       }
-
-       // ذخیره در دیتابیس (atomic update)
-       user.coins = balanceAfter;
-       await user.save();
-
-       // ثبت در لاگ سکه
-       await CoinLogModel.record(
-              targetId,
-              amount,
-              CoinChangeReason.AdminGift,
-              balanceAfter,
-              String(ctx.from!.id),
-       );
-
-       const direction = amount > 0 ? '🎁 اهدا' : '➖ کسر';
-       const amountText = amount > 0 ? `+${amount}` : String(amount);
-
-       // پیام تأیید به ادمین
-       await ctx.reply(
-              `✅ *عملیات موفق*\n\n` +
-              `👤 کاربر: \`${targetId}\` (${user.name ?? '—'})\n` +
-              `${direction}: *${amountText} سکه*\n` +
-              `📊 موجودی قبل: ${balanceBefore} → بعد: ${balanceAfter}`,
-              { parse_mode: 'Markdown' },
-       );
-
-       // اطلاع‌رسانی به کاربر
-       const userMsg =
-              amount > 0
-                     ? `🎁 *${amount} سکه هدیه دریافت کردی!*\n\nموجودی فعلی: ${balanceAfter} سکه 🪙`
-                     : `📢 *اطلاعیه حساب*\n\n${Math.abs(amount)} سکه از حسابت کسر شد.\nموجودی فعلی: ${balanceAfter} سکه 🪙`;
-
-       await bot.telegram
-              .sendMessage(targetId, userMsg, { parse_mode: 'Markdown' })
-              .catch(() => {
-                     // کاربر ربات را بلاک کرده — نادیده می‌گیریم
-              });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -471,8 +361,8 @@ export async function handleReportAction(
               await report.resolve(ReportStatus.Dismissed, adminId);
               await ctx.answerCbQuery('✅ گزارش رد شد.');
               await ctx.editMessageText(
-                     `✅ گزارش \`${reportId}\` رد شد.`,
-                     { parse_mode: 'Markdown' },
+                     `✅ گزارش <code>${reportId}</code> رد شد.`,
+                     { parse_mode: 'HTML' },
               ).catch(() => { });
 
        } else if (action === 'warn') {
@@ -489,16 +379,16 @@ export async function handleReportAction(
 
                      await bot.telegram.sendMessage(
                             report.reportedId,
-                            `⚠️ *اخطار ${reported.warnings}*\n\nرفتارت گزارش شد. در صورت تکرار بن خواهی شد.`,
-                            { parse_mode: 'Markdown' },
+                            `⚠️ <b>اخطار ${reported.warnings}</b>\n\nرفتارت گزارش شد. در صورت تکرار بن خواهی شد.`,
+                            { parse_mode: 'HTML' },
                      ).catch(() => { });
 
                      const resultText = autoBan
                             ? `⚠️→🚫 اخطار داده شد و بن خودکار اعمال شد (اخطار ${reported.warnings}).`
-                            : `⚠️ اخطار ${reported.warnings} به کاربر \`${report.reportedId}\` داده شد.`;
+                            : `⚠️ اخطار ${reported.warnings} به کاربر <code>${report.reportedId}</code> داده شد.`;
 
                      await ctx.answerCbQuery('✅ اخطار ثبت شد.');
-                     await ctx.editMessageText(resultText, { parse_mode: 'Markdown' }).catch(() => { });
+                     await ctx.editMessageText(resultText, { parse_mode: 'HTML' }).catch(() => { });
               }
 
        } else if (action === 'ban') {
@@ -517,8 +407,8 @@ export async function handleReportAction(
 
               await ctx.answerCbQuery('✅ کاربر بن شد.');
               await ctx.editMessageText(
-                     `🚫 کاربر \`${report.reportedId}\` بن شد.`,
-                     { parse_mode: 'Markdown' },
+                     `🚫 کاربر <code>${report.reportedId}</code> بن شد.`,
+                     { parse_mode: 'HTML' },
               ).catch(() => { });
        }
 }

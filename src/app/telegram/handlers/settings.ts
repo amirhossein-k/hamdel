@@ -54,13 +54,13 @@ export function interestsKeyboard(selected: string[]) {
 export async function showSettingsMenu(ctx: BotContext): Promise<void> {
        const user = ctx.dbUser!;
        await ctx.reply(
-              `⚙️ *تنظیمات پروفایل*\n\n` +
+              `⚙️ <b>تنظیمات پروفایل</b>\n\n` +
               `📛 نام: ${user.name ?? '—'}\n` +
               `🎂 سن: ${user.age ?? '—'}\n` +
               `📍 ${user.province ?? '—'} — ${user.city ?? '—'}\n` +
               `🎯 علایق: ${user.interests.length > 0 ? user.interests.join('، ') : '—'}\n\n` +
               `چه چیزی می‌خوای ویرایش کنی؟`,
-              { parse_mode: 'Markdown', ...settingsMenuKeyboard() },
+              { parse_mode: 'HTML', ...settingsMenuKeyboard() },
        );
 }
 
@@ -72,8 +72,8 @@ export async function startEditName(ctx: BotContext): Promise<void> {
        ctx.session.step = 'settings:name';
        await ctx.answerCbQuery();
        await ctx.reply(
-              `📛 نام فعلی: *${ctx.dbUser!.name}*\n\nنام جدید رو وارد کن:`,
-              { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
+              `📛 نام فعلی: <b>${ctx.dbUser!.name}</b>\n\nنام جدید رو وارد کن:`,
+              { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } },
        );
 }
 
@@ -89,7 +89,7 @@ export async function handleEditName(ctx: BotContext): Promise<void> {
        await ctx.dbUser!.save();
        ctx.session.step = undefined;
 
-       await ctx.reply(`✅ نام به *${text}* تغییر کرد.`, { parse_mode: 'Markdown', ...mainMenuKeyboard });
+       await ctx.reply(`✅ نام به <b>${text}</b> تغییر کرد.`, { parse_mode: 'HTML', ...mainMenuKeyboard });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -100,8 +100,8 @@ export async function startEditAge(ctx: BotContext): Promise<void> {
        ctx.session.step = 'settings:age';
        await ctx.answerCbQuery();
        await ctx.reply(
-              `🎂 سن فعلی: *${ctx.dbUser!.age}*\n\nسن جدید رو وارد کن:`,
-              { parse_mode: 'Markdown', reply_markup: { remove_keyboard: true } },
+              `🎂 سن فعلی: <b>${ctx.dbUser!.age}</b>\n\nسن جدید رو وارد کن:`,
+              { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } },
        );
 }
 
@@ -118,7 +118,7 @@ export async function handleEditAge(ctx: BotContext): Promise<void> {
        await ctx.dbUser!.save();
        ctx.session.step = undefined;
 
-       await ctx.reply(`✅ سن به *${age}* تغییر کرد.`, { parse_mode: 'Markdown', ...mainMenuKeyboard });
+       await ctx.reply(`✅ سن به <b>${age}</b> تغییر کرد.`, { parse_mode: 'HTML', ...mainMenuKeyboard });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -129,8 +129,8 @@ export async function startEditProvince(ctx: BotContext): Promise<void> {
        ctx.session.step = 'settings:province';
        await ctx.answerCbQuery();
        await ctx.reply(
-              `📍 استان فعلی: *${ctx.dbUser!.province}*\n\nاستان جدید رو انتخاب کن:`,
-              { parse_mode: 'Markdown', ...provinceKeyboard },
+              `📍 استان فعلی: <b>${ctx.dbUser!.province}</b>\n\nاستان جدید رو انتخاب کن:`,
+              { parse_mode: 'HTML', ...provinceKeyboard },
        );
 }
 
@@ -170,8 +170,8 @@ export async function handleEditCity(ctx: BotContext): Promise<void> {
        ctx.session.step = undefined;
 
        await ctx.reply(
-              `✅ موقعیت به *${user.province} — ${text}* تغییر کرد.`,
-              { parse_mode: 'Markdown', ...mainMenuKeyboard },
+              `✅ موقعیت به <b>${user.province} — ${text}</b> تغییر کرد.`,
+              { parse_mode: 'HTML', ...mainMenuKeyboard },
        );
 }
 
@@ -183,18 +183,18 @@ export async function showInterests(ctx: BotContext): Promise<void> {
        const user = ctx.dbUser!;
        await ctx.answerCbQuery();
        await ctx.editMessageText(
-              `🎯 *علایق من*\n\n` +
+              `🎯 <b>علایق من</b>\n\n` +
               `علایقت رو انتخاب کن (می‌تونی چند تا انتخاب کنی):\n` +
               `علایق انتخاب‌شده با ✅ مشخص‌اند.`,
               {
-                     parse_mode: 'Markdown',
+                     parse_mode: 'HTML',
                      ...interestsKeyboard(user.interests),
               },
        ).catch(async () => {
               // اگر editMessageText ممکن نبود، پیام جدید ارسال کن
               await ctx.reply(
-                     `🎯 *علایق من*\n\nعلایقت رو انتخاب کن:`,
-                     { parse_mode: 'Markdown', ...interestsKeyboard(user.interests) },
+                     `🎯 <b>علایق من</b>\n\nعلایقت رو انتخاب کن:`,
+                     { parse_mode: 'HTML', ...interestsKeyboard(user.interests) },
               );
        });
 }
@@ -234,7 +234,7 @@ export async function saveInterests(ctx: BotContext): Promise<void> {
               : 'هیچ علاقه‌ای انتخاب نشده';
 
        await ctx.editMessageText(
-              `✅ *علایق ذخیره شد*\n\nعلایق شما: ${interestText}`,
-              { parse_mode: 'Markdown', ...settingsMenuKeyboard() },
+              `✅ <b>علایق ذخیره شد</b>\n\nعلایق شما: ${interestText}`,
+              { parse_mode: 'HTML', ...settingsMenuKeyboard() },
        ).catch(() => { });
 }

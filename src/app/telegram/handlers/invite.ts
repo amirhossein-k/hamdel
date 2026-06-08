@@ -30,16 +30,16 @@ export async function showInvitePage(ctx: BotContext): Promise<void> {
        const coinsEarned = invitedCount * COIN_REWARD_INVITE;
 
        await ctx.reply(
-              `🔗 *دعوت دوستان*\n\n` +
-              `با دعوت هر دوست، *${COIN_REWARD_INVITE} سکه* رایگان بگیر!\n\n` +
-              `📊 *آمار دعوت‌های شما:*\n` +
+              `🔗 <b>دعوت دوستان</b>\n\n` +
+              `با دعوت هر دوست، <b>${COIN_REWARD_INVITE} سکه</b> رایگان بگیر!\n\n` +
+              `📊 <b>آمار دعوت‌های شما:</b>\n` +
               `👥 تعداد دعوت‌شده‌ها: ${invitedCount} نفر\n` +
               `🪙 سکه کسب‌شده از دعوت: ${coinsEarned} سکه\n\n` +
-              `🔗 *لینک دعوت اختصاصی شما:*\n` +
+              `🔗 <b>لینک دعوت اختصاصی شما:</b>\n` +
               `${inviteLink}\n\n` +
-              `📋 *کد دعوت شما:* \`${user.inviteCode}\`\n\n` +
+              `📋 <b>کد دعوت شما:</b> \`${user.inviteCode}\`\n\n` +
               `_لینک رو برای دوستات بفرست. بعد از تکمیل ثبت‌نام دوستت، سکه‌هات شارژ میشه!_`,
-              { parse_mode: 'Markdown' },
+              { parse_mode: 'HTML' },
        );
 }
 
@@ -77,11 +77,11 @@ export async function rewardInviter(
               // اطلاع به دعوت‌کننده
               await bot.telegram.sendMessage(
                      inviter.telegramId,
-                     `🎁 *پاداش دعوت!*\n\n` +
+                     `🎁 <b>پاداش دعوت!</b>\n\n` +
                      `یکی از دوستایی که دعوت کردی ثبت‌نامش رو کامل کرد.\n` +
-                     `🪙 *${COIN_REWARD_INVITE} سکه* به حسابت اضافه شد!\n\n` +
+                     `🪙 <b>${COIN_REWARD_INVITE} سکه</b> به حسابت اضافه شد!\n\n` +
                      `💰 موجودی فعلی: ${inviter.coins} سکه`,
-                     { parse_mode: 'Markdown' },
+                     { parse_mode: 'HTML' },
               ).catch(() => { });
 
        } catch (err) {
