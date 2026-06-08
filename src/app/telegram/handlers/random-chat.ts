@@ -1,6 +1,5 @@
 // src/app/telegram/handlers/random-chat.ts
-// ─── سیستم چت تصادفی (با پشتیبانی از جستجوی انتخابی) ───────────────────────
-//
+// ─── سیستم چت تصادفی (با پشتیبانی از جستجوی انتخابی) 
 //  جریان چت تصادفی ساده:
 //  1. کاربر «🎲 چت تصادفی» → انتخاب جنسیت طرف مقابل
 //  2. ورود به صف با targetGender
@@ -14,7 +13,15 @@
 
 import { Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { UserState, Gender, ChatType, MessageType, COIN_COST_FEMALE_CHAT, TargetGender, SearchMode } from '@/types/enums';
+import {
+       UserState,
+       Gender,
+       ChatType,
+       MessageType,
+       COIN_COST_FEMALE_CHAT,
+       TargetGender,
+       SearchMode,
+} from '@/types/enums';
 import { RandomQueueModel } from '@/models/queue.model';
 import { ChatModel, MessageModel } from '@/models/chat.model';
 import { ReportModel } from '@/models/queue.model';
@@ -30,7 +37,9 @@ import { nanoid } from 'nanoid';
 import { forwardPhotoToAdmin, checkAndAutoBan } from './moderation';
 import type { Message } from 'telegraf/types';
 
-// ─── تابع کمکی: ارسال پیام به کاربر دیگر ─────────────────
+// ══════════════════════════════════════════════════════════
+//  توابع کمکی
+// ══════════════════════════════════════════════════════════
 
 async function sendToPartner(
        bot: Telegraf<BotContext>,
@@ -63,8 +72,6 @@ async function sendToPartner(
        }
 }
 
-// ─── تابع کمکی: ذخیره پیام در DB ─────────────────────────
-
 async function saveMessage(
        chatId: string,
        senderId: number,
@@ -90,8 +97,22 @@ async function saveMessage(
        await MessageModel.create({ chatId, senderId, type, content });
 }
 
+async function notifyInQueue(ctx: BotContext, searchMode: SearchMode): Promise<void> {
+       const modeLabel: Record<SearchMode, string> = {
+              [SearchMode.Random]: 'تصادفی',
+              [SearchMode.GenderSelect]: 'با جنسیت انتخابی',
+              [SearchMode.SameProvince]: 'هم‌استانی',
+              [SearchMode.SameAge]: 'هم‌سن',
+              [SearchMode.Nearby]: 'در نزدیکی شما',
+       };
+       await ctx.reply(
+              `🔍 داریم دنبال همصحبت ${modeLabel[searchMode]} می‌گردیم...\n\nبرای لغو «❌ لغو جستجو» رو بزن.`,
+              inQueueKeyboard,
+       );
+}
+
 // ══════════════════════════════════════════════════════════
-//  مرحله اول: نمایش منوی انتخاب جنسیت (چت تصادفی ساده)
+//  شروع چت تصادفی — نمایش انتخاب جنسیت
 // ══════════════════════════════════════════════════════════
 
 export async function startRandomChat(ctx: BotContext): Promise<void> {
@@ -118,7 +139,7 @@ export async function startRandomChat(ctx: BotContext): Promise<void> {
 }
 
 // ══════════════════════════════════════════════════════════
-//  مرحله اول: نمایش منوی جستجوی انتخابی
+//  شروع جستجوی انتخابی — نمایش منوی حالت‌ها
 // ══════════════════════════════════════════════════════════
 
 export async function startSmartSearch(ctx: BotContext): Promise<void> {
@@ -144,7 +165,7 @@ export async function startSmartSearch(ctx: BotContext): Promise<void> {
 }
 
 // ══════════════════════════════════════════════════════════
-//  هندلر متن‌های مرحله‌ای (session step)
+//  هندلر مراحل session مربوط به صف
 // ══════════════════════════════════════════════════════════
 
 export async function handleQueueStep(
@@ -154,7 +175,7 @@ export async function handleQueueStep(
 ): Promise<boolean> {
        const step = ctx.session.step;
 
-       // ─── مرحله انتخاب جنسیت طرف مقابل ──────────────────
+       // ─── انتخاب جنسیت طرف مقابل ──────────────────────────
        if (step === 'queue:gender_select') {
               if (text === '🔙 بازگشت') {
                      ctx.session.step = undefined;
@@ -173,12 +194,11 @@ export async function handleQueueStep(
 
               ctx.session.step = undefined;
               ctx.session.pendingTargetGender = undefined;
-
               await joinRandomQueue(ctx, bot, targetGender, SearchMode.GenderSelect);
               return true;
        }
 
-       // ─── مرحله منوی جستجوی انتخابی ──────────────────────
+       // ─── منوی جستجوی انتخابی ──────────────────────────────
        if (step === 'queue:smart_search') {
               if (text === '🔙 بازگشت') {
                      ctx.session.step = undefined;
@@ -211,15 +231,12 @@ export async function handleQueueStep(
               if (text === '📍 جستجو براساس نزدیکی') {
                      const user = ctx.dbUser!;
                      if (user.location?.coordinates) {
-                            // موقعیت قبلاً ثبت شده — مستقیم وارد صف می‌شود
                             ctx.session.step = undefined;
                             await joinRandomQueue(ctx, bot, TargetGender.Any, SearchMode.Nearby);
                      } else {
-                            // درخواست موقعیت مکانی
                             ctx.session.step = 'queue:waiting_location';
                             await ctx.reply(
-                                   '📍 برای جستجوی نزدیکی، موقعیت مکانی‌ات رو بفرست:\n\n' +
-                                   '(دکمه 📎 → Location را بزن)',
+                                   '📍 برای جستجوی نزدیکی، موقعیت مکانی‌ات رو بفرست:\n\n(دکمه 📎 → Location را بزن)',
                                    { reply_markup: { keyboard: [['❌ انصراف']], resize_keyboard: true } },
                             );
                      }
@@ -237,7 +254,6 @@ export async function handleQueueStep(
                      await ctx.reply('لغو شد.', mainMenuKeyboard);
                      return true;
               }
-              // اگر متن بود ولی location نداشت
               await ctx.reply('📍 لطفاً موقعیت مکانی‌ات رو از طریق دکمه 📎 → Location بفرست.');
               return true;
        }
@@ -245,7 +261,9 @@ export async function handleQueueStep(
        return false;
 }
 
-// ─── هندلر پیام location ──────────────────────────────────
+// ══════════════════════════════════════════════════════════
+//  هندلر پیام location (موقعیت مکانی)
+// ══════════════════════════════════════════════════════════
 
 export async function handleLocationMessage(
        ctx: BotContext,
@@ -260,7 +278,6 @@ export async function handleLocationMessage(
        const user = ctx.dbUser!;
        const { longitude, latitude } = msg.location;
 
-       // ذخیره موقعیت در پروفایل کاربر
        user.location = { type: 'Point', coordinates: [longitude, latitude] };
        await user.save();
 
@@ -293,13 +310,17 @@ export async function joinRandomQueue(
               return;
        }
 
-       // ─── ساخت entry صف ──────────────────────────────────
-       const extra: { province?: string; age?: number; location?: { type: 'Point'; coordinates: [number, number] } } = {};
+       // ─── ساخت extra برای searchMode ─────────────────────
+       const extra: {
+              province?: string;
+              age?: number;
+              location?: { type: 'Point'; coordinates: [number, number] };
+       } = {};
        if (searchMode === SearchMode.SameProvince && user.province) extra.province = user.province;
        if (searchMode === SearchMode.SameAge && user.age) extra.age = user.age;
        if (searchMode === SearchMode.Nearby && user.location) extra.location = user.location;
 
-       // ابتدا ثبت در صف تا برای match دیدن اطلاعات داریم
+       // ─── ثبت در صف ───────────────────────────────────────
        const myEntry = await RandomQueueModel.enqueue(
               user.telegramId,
               user.gender!,
@@ -308,19 +329,21 @@ export async function joinRandomQueue(
               extra,
        );
 
-       // ─── جستجوی مچ ──────────────────────────────────────
+       // ─── جستجوی مچ ───────────────────────────────────────
        const match = await RandomQueueModel.findMatch(user.telegramId, myEntry);
 
        if (match) {
               const partner = await UserModel.findByTelegramId(match.telegramId);
               if (!partner) {
+                     // طرف مقابل در DB نیست — از صف حذف و در صف بمان
                      await RandomQueueModel.dequeue(match.telegramId);
-                     // بمان در صف
+                     user.state = UserState.InQueue;
+                     await user.save();
                      await notifyInQueue(ctx, searchMode);
                      return;
               }
 
-              // بررسی سکه: پسر + دختر → نیاز به سکه
+              // ─── بررسی سکه: پسر + دختر ──────────────────────
               if (user.gender === Gender.Male && partner.gender === Gender.Female) {
                      if (!user.hasEnoughCoinsForFemaleChat()) {
                             await RandomQueueModel.dequeue(user.telegramId);
@@ -336,7 +359,7 @@ export async function joinRandomQueue(
                      await user.save();
               }
 
-              // ساخت چت جدید
+              // ─── ساخت چت جدید ────────────────────────────────
               const chatId = nanoid(12);
               await ChatModel.create({
                      chatId,
@@ -359,25 +382,11 @@ export async function joinRandomQueue(
               await bot.telegram.sendMessage(partner.telegramId, startMsg, inChatKeyboard);
 
        } else {
-              // مچی پیدا نشد — در صف بمان
+              // ─── مچ نشد — در صف بمان ─────────────────────────
               user.state = UserState.InQueue;
               await user.save();
               await notifyInQueue(ctx, searchMode);
        }
-}
-
-async function notifyInQueue(ctx: BotContext, searchMode: SearchMode): Promise<void> {
-       const modeLabel: Record<SearchMode, string> = {
-              [SearchMode.Random]: 'تصادفی',
-              [SearchMode.GenderSelect]: 'با جنسیت انتخابی',
-              [SearchMode.SameProvince]: 'هم‌استانی',
-              [SearchMode.SameAge]: 'هم‌سن',
-              [SearchMode.Nearby]: 'در نزدیکی شما',
-       };
-       await ctx.reply(
-              `🔍 داریم دنبال همصحبت ${modeLabel[searchMode]} می‌گردیم...\n\nبرای لغو «❌ لغو جستجو» رو بزن.`,
-              inQueueKeyboard,
-       );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -426,8 +435,14 @@ export async function forwardChatMessage(
                      await startReport(ctx, chat.chatId, partnerId);
                      return;
               }
+
+              if (text === '👤 پروفایل طرف مقابل') {
+                     await showPartnerProfile(ctx, partnerId);
+                     return;
+              }
        }
 
+       // forward پیام به طرف مقابل
        try {
               await sendToPartner(bot, partnerId, ctx, chat.chatId);
               await saveMessage(chat.chatId, user.telegramId, ctx);
@@ -482,7 +497,10 @@ export async function startReport(
        );
 }
 
-export async function submitReport(ctx: BotContext, bot: Telegraf<BotContext>): Promise<void> {
+export async function submitReport(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+): Promise<void> {
        const user = ctx.dbUser!;
        const text = ctx.message && 'text' in ctx.message ? ctx.message.text.trim() : null;
 
@@ -516,4 +534,39 @@ export async function submitReport(ctx: BotContext, bot: Telegraf<BotContext>): 
        } else {
               await ctx.reply('✅ گزارش ثبت شد. ممنون از همکاریت.', mainMenuKeyboard);
        }
+}
+
+// ══════════════════════════════════════════════════════════
+//  نمایش پروفایل طرف مقابل در حین چت
+// ══════════════════════════════════════════════════════════
+
+async function showPartnerProfile(ctx: BotContext, partnerId: number): Promise<void> {
+       const partner = await UserModel.findByTelegramId(partnerId);
+       if (!partner) {
+              await ctx.reply('⚠️ اطلاعات طرف مقابل یافت نشد.');
+              return;
+       }
+
+       const genderText = partner.gender === 'male' ? '👦 پسر' : '👧 دختر';
+       const interests = partner.interests.length > 0 ? partner.interests.join(' ') : '—';
+
+       const diff = Date.now() - partner.lastActive.getTime();
+       const mins = Math.floor(diff / 60_000);
+       let onlineStatus: string;
+       if (mins < 2) onlineStatus = '🟢 آنلاین';
+       else if (mins < 60) onlineStatus = `🟡 ${mins} دقیقه پیش`;
+       else if (mins < 1440) onlineStatus = `⚫ ${Math.floor(mins / 60)} ساعت پیش`;
+       else onlineStatus = `⚫ ${Math.floor(mins / 1440)} روز پیش`;
+
+       await ctx.reply(
+              `👤 <b>پروفایل همصحبت</b>\n\n` +
+              `📛 نام: <b>${partner.name ?? '—'}</b>\n` +
+              `${genderText}\n` +
+              `🎂 سن: ${partner.age ?? '—'}\n` +
+              `📍 استان: ${partner.province ?? '—'}\n` +
+              `🏙️ شهر: ${partner.city ?? '—'}\n` +
+              `🎯 علایق: ${interests}\n` +
+              `🕐 آخرین آنلاین: ${onlineStatus}`,
+              { parse_mode: 'HTML' },
+       );
 }

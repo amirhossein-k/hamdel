@@ -75,6 +75,7 @@ export const browseGenderKeyboard = Markup.keyboard([
 
 export const inChatKeyboard = Markup.keyboard([
        ['🔚 پایان چت', '🚨 گزارش'],
+       ['👤 پروفایل طرف مقابل'],
 ]).resize();
 
 // ─── در صف انتظار ─────────────────────────────────────────

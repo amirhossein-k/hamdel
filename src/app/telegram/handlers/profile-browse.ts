@@ -252,8 +252,7 @@ export async function handleViewProfileCallback(
               `📍 استان: ${target.province ?? '—'}\n` +
               `🏙️ شهر: ${target.city ?? '—'}\n` +
               `🎯 علایق: ${interests}\n` +
-              `🕐 آخرین آنلاین: ${onlineStatus}\n` +
-              `🆔 کد دعوت: <code>${target.inviteCode}</code>`;
+              `🕐 آخرین آنلاین: ${onlineStatus}\n`;
 
        // دکمه‌ها — برای خودت دکمه چت و پیام و گزارش نشون نده
        const buttons =
