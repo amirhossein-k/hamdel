@@ -412,3 +412,95 @@ export async function handleReportAction(
               ).catch(() => { });
        }
 }
+
+// ══════════════════════════════════════════════════════════
+//  /givecoin <id> <amount> — اهدای سکه به کاربر توسط ادمین
+// ══════════════════════════════════════════════════════════
+
+export async function giveCoinHandler(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+): Promise<void> {
+       if (!isAdmin(ctx)) return;
+
+       const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+       const parts = text.trim().split(/\s+/);
+
+       if (parts.length < 3) {
+              await ctx.reply(
+                     '❌ فرمت نادرست.\n\n' +
+                     'استفاده صحیح:\n' +
+                     '<code>/givecoin &lt;telegramId&gt; &lt;مقدار&gt;</code>\n\n' +
+                     'مثال: <code>/givecoin 123456789 50</code>\n' +
+                     'کسر سکه: <code>/givecoin 123456789 -10</code>',
+                     { parse_mode: 'HTML' },
+              );
+              return;
+       }
+
+       const targetId = Number(parts[1]);
+       const amount = Number(parts[2]);
+
+       if (!Number.isInteger(targetId) || targetId <= 0) {
+              await ctx.reply('❌ telegramId نامعتبر است.');
+              return;
+       }
+
+       if (!Number.isInteger(amount) || amount === 0) {
+              await ctx.reply('❌ مقدار سکه باید یک عدد صحیح غیر صفر باشد.');
+              return;
+       }
+
+       const user = await UserModel.findByTelegramId(targetId);
+       if (!user) {
+              await ctx.reply(`❌ کاربری با آیدی <code>${targetId}</code> پیدا نشد.`, {
+                     parse_mode: 'HTML',
+              });
+              return;
+       }
+
+       const balanceBefore = user.coins;
+       const balanceAfter = Math.max(0, balanceBefore + amount);
+
+       if (amount < 0 && balanceBefore + amount < 0) {
+              await ctx.reply(
+                     `❌ موجودی کاربر (${balanceBefore} سکه) کمتر از مقدار کسر است.\n` +
+                     `حداکثر: <code>/givecoin ${targetId} -${balanceBefore}</code>`,
+                     { parse_mode: 'HTML' },
+              );
+              return;
+       }
+
+       user.coins = balanceAfter;
+       await user.save();
+
+       // ثبت لاگ — CoinLogModel را lazy import می‌کنیم تا circular dependency نباشد
+       const { CoinLogModel } = await import('@/models/coin.model');
+       const { CoinChangeReason } = await import('@/types/enums');
+       await CoinLogModel.record(
+              targetId,
+              amount,
+              CoinChangeReason.AdminGift,
+              balanceAfter,
+              String(ctx.from!.id),
+       );
+
+       const direction = amount > 0 ? '🎁 اهدا' : '➖ کسر';
+       const amountText = amount > 0 ? `+${amount}` : String(amount);
+
+       await ctx.reply(
+              `✅ <b>عملیات موفق</b>\n\n` +
+              `👤 کاربر: <code>${targetId}</code> (${user.name ?? '—'})\n` +
+              `${direction}: <b>${amountText} سکه</b>\n` +
+              `📊 موجودی: ${balanceBefore} → ${balanceAfter}`,
+              { parse_mode: 'HTML' },
+       );
+
+       const userMsg = amount > 0
+              ? `🎁 <b>${amount} سکه هدیه دریافت کردی!</b>\n\nموجودی فعلی: ${balanceAfter} سکه 🪙`
+              : `📢 <b>اطلاعیه حساب</b>\n\n${Math.abs(amount)} سکه از حسابت کسر شد.\nموجودی فعلی: ${balanceAfter} سکه 🪙`;
+
+       await bot.telegram
+              .sendMessage(targetId, userMsg, { parse_mode: 'HTML' })
+              .catch(() => { });
+}
