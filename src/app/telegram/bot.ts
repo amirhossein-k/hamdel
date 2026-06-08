@@ -49,9 +49,10 @@ bot.use(authMiddleware);
 // ─── دستورات عمومی ───────────────────────────────────────
 
 bot.start(startHandler);
-bot.on('message', makeMessageRouter(bot));
 
-// ─── دستورات ادمین ───────────────────────────────────────
+// ─── دستورات ادمین (باید قبل از bot.on('message') باشند) ─
+// telegraf دستورات را به ترتیب ثبت اجرا می‌کند؛
+// اگر bot.on('message') اول بیاید همه پیام‌ها را می‌بلعد.
 
 bot.command('admin', (ctx) => adminMenuHandler(ctx));
 bot.command('stats', (ctx) => statsHandler(ctx));
@@ -61,6 +62,9 @@ bot.command('unban', (ctx) => unbanHandler(ctx, bot));
 bot.command('warn', (ctx) => warnHandler(ctx, bot));
 bot.command('userinfo', (ctx) => userInfoHandler(ctx));
 bot.command('givecoin', (ctx) => giveCoinHandler(ctx, bot));
+
+// ─── روتر عمومی پیام‌ها (باید آخر باشد) ──────────────────
+bot.on('message', makeMessageRouter(bot));
 
 // ─── Callback Query ها ───────────────────────────────────
 

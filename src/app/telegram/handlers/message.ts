@@ -39,10 +39,19 @@ export function makeMessageRouter(bot: Telegraf<BotContext>) {
                      return;
               }
 
-              // ─── ادمین از روتر عادی عبور می‌کند ─────────────────
-              // دستورات ادمین توسط bot.command ثبت شده‌اند.
-              // پیام‌های متنی ادمین نباید وارد فلوی کاربر عادی شوند.
-              if (isAdmin(ctx)) return;
+              // ─── ادمین از روتر کاربر عادی خارج می‌شود ────────────
+              // دستورات /admin /ban /stats ... توسط bot.command پردازش می‌شوند.
+              // پیام‌های متنی ادمین (غیر دستور) نباید وارد فلوی ثبت‌نام شوند.
+              if (isAdmin(ctx)) {
+                     const msgText = getText(ctx) ?? '';
+                     // اگر دستور بود (/) telegraf خودش هندل کرده — اینجا نمی‌رسد
+                     // اگر متن آزاد بود، منوی ادمین را نشان بده
+                     if (!msgText.startsWith('/')) {
+                            const { adminMenuHandler } = await import('./admin');
+                            await adminMenuHandler(ctx);
+                     }
+                     return;
+              }
 
               const text = getText(ctx);
 

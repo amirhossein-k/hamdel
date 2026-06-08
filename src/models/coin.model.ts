@@ -53,7 +53,7 @@ const TransactionSchema = new Schema<ITransactionDocument, ITransactionModel>(
                      enum: Object.values(TransactionStatus),
                      default: TransactionStatus.Pending,
               },
-              paymentAuthority: { type: String, default: null, sparse: true },
+              paymentAuthority: { type: String, default: null },
               createdAt: { type: Date, default: () => new Date() },
               paidAt: { type: Date, default: null },
        },
