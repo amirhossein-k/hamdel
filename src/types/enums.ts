@@ -24,6 +24,22 @@ export enum ChatType {
        Direct = 'direct',
 }
 
+// نوع جنسیت مورد نظر کاربر در صف چت تصادفی
+export enum TargetGender {
+       Male = 'male',
+       Female = 'female',
+       Any = 'any',
+}
+
+// نوع جستجوی انتخابی
+export enum SearchMode {
+       Random = 'random',           // چت تصادفی معمولی
+       GenderSelect = 'gender_select', // انتخاب جنسیت طرف مقابل
+       SameProvince = 'same_province',  // هم‌استانی
+       SameAge = 'same_age',        // هم‌سن (±5 سال)
+       Nearby = 'nearby',           // نزدیکی جغرافیایی
+}
+
 export enum ChatStatus {
        Active = 'active',
        Closed = 'closed',

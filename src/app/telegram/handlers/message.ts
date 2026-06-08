@@ -6,7 +6,15 @@ import type { BotContext } from '../context';
 import { UserState } from '@/types/enums';
 import { handleRegistrationStep } from './registration';
 import { mainMenuKeyboard } from '@/lib/keyboards';
-import { joinRandomQueue, leaveQueue, forwardChatMessage, submitReport } from './random-chat';
+import {
+       leaveQueue,
+       forwardChatMessage,
+       submitReport,
+       handleQueueStep,
+       handleLocationMessage,
+       startRandomChat,
+       startSmartSearch,
+} from './random-chat';
 import { startDirectChat, handleDirectChatSearch } from './direct-chat';
 import { showCoinsPage } from './coin';
 import { showInvitePage } from './invite';
@@ -17,6 +25,8 @@ import {
        handleEditProvince,
        handleEditCity,
 } from './settings';
+import { showProfileBrowseMenu, handleProfileBrowseStep } from './profile-browse';
+import type { Message } from 'telegraf/types';
 
 // ─── متن پیام ────────────────────────────────────────────
 
@@ -38,11 +48,18 @@ export function makeMessageRouter(bot: Telegraf<BotContext>) {
                      return;
               }
 
+              // ─── پیام location ─────────────────────────────────
+              if (ctx.message && 'location' in ctx.message) {
+                     await handleLocationMessage(ctx, bot);
+                     return;
+              }
+
               const text = getText(ctx);
 
               // ─── session steps ───────────────────────────────────
 
               const step = ctx.session?.step;
+
               if (step?.startsWith('report:')) {
                      await submitReport(ctx, bot);
                      return;
@@ -53,24 +70,21 @@ export function makeMessageRouter(bot: Telegraf<BotContext>) {
                      return;
               }
 
-              if (step === 'settings:name') {
-                     await handleEditName(ctx);
-                     return;
+              if (step === 'settings:name') { await handleEditName(ctx); return; }
+              if (step === 'settings:age') { await handleEditAge(ctx); return; }
+              if (step === 'settings:province') { await handleEditProvince(ctx); return; }
+              if (step === 'settings:city') { await handleEditCity(ctx); return; }
+
+              // ─── مراحل صف تصادفی ─────────────────────────────────
+              if (step?.startsWith('queue:') && text !== null) {
+                     const handled = await handleQueueStep(ctx, bot, text);
+                     if (handled) return;
               }
 
-              if (step === 'settings:age') {
-                     await handleEditAge(ctx);
-                     return;
-              }
-
-              if (step === 'settings:province') {
-                     await handleEditProvince(ctx);
-                     return;
-              }
-
-              if (step === 'settings:city') {
-                     await handleEditCity(ctx);
-                     return;
+              // ─── مراحل مرور پروفایل ──────────────────────────────
+              if (step?.startsWith('profile:') && text !== null) {
+                     const handled = await handleProfileBrowseStep(ctx, text);
+                     if (handled) return;
               }
 
               // ─── state-based routing ─────────────────────────────
@@ -117,11 +131,19 @@ async function handleMainMenu(
        switch (text) {
 
               case '🎲 چت تصادفی':
-                     await joinRandomQueue(ctx, bot);
+                     await startRandomChat(ctx);
+                     break;
+
+              case '🔍 جستجوی انتخابی':
+                     await startSmartSearch(ctx);
                      break;
 
               case '💬 چت مستقیم':
                      await startDirectChat(ctx);
+                     break;
+
+              case '👥 جستجو براساس پروفایل':
+                     await showProfileBrowseMenu(ctx);
                      break;
 
               case '👤 پروفایل من':

@@ -29,6 +29,7 @@ import {
        saveInterests,
        showSettingsMenu,
 } from './handlers/settings';
+import { handleShowIdCallback } from './handlers/profile-browse';
 
 const bot = new Telegraf<BotContext>(process.env.BOT_TOKEN!);
 
@@ -122,6 +123,11 @@ bot.action(/^admin_report:([^:]+):(warn|ban|dismiss)$/, async (ctx) => {
        const reportId = ctx.match[1];
        const action = ctx.match[2] as 'warn' | 'ban' | 'dismiss';
        await handleReportAction(ctx, bot, reportId, action);
+});
+
+// نمایش آیدی پروفایل
+bot.action(/^show_id:(\d+)$/, async (ctx) => {
+       await handleShowIdCallback(ctx);
 });
 
 // ─── Webhook Handler ──────────────────────────────────────
