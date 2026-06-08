@@ -26,7 +26,32 @@ import { mainMenuKeyboard } from '@/lib/keyboards';
 
 export function isAdmin(ctx: BotContext): boolean {
        const adminId = Number(process.env.ADMIN_TELEGRAM_ID);
-       return !!adminId && ctx.from?.id === adminId;
+       if (!adminId) return false;
+       return ctx.from?.id === adminId;
+}
+
+// ─── بررسی با پیام خطا (برای دستوراتی که فقط ادمین می‌زند) ─
+
+export async function requireAdmin(ctx: BotContext): Promise<boolean> {
+       const adminId = Number(process.env.ADMIN_TELEGRAM_ID);
+
+       if (!adminId) {
+              await ctx.reply(
+                     '⚠️ متغیر <code>ADMIN_TELEGRAM_ID</code> در سرور تنظیم نشده است.\n\n' +
+                     `آیدی تلگرام شما: <code>${ctx.from?.id}</code>\n\n` +
+                     'این مقدار را در فایل <code>.env.local</code> ست کنید:\n' +
+                     `<code>ADMIN_TELEGRAM_ID=${ctx.from?.id}</code>`,
+                     { parse_mode: 'HTML' },
+              );
+              return false;
+       }
+
+       if (ctx.from?.id !== adminId) {
+              // برای کاربر عادی چیزی نشان نمی‌دهیم
+              return false;
+       }
+
+       return true;
 }
 
 // ─── Inline keyboard تصمیم روی گزارش ────────────────────
@@ -46,7 +71,7 @@ function reportActionKeyboard(reportId: string) {
 // ══════════════════════════════════════════════════════════
 
 export async function adminMenuHandler(ctx: BotContext): Promise<void> {
-       if (!isAdmin(ctx)) return;
+       if (!await requireAdmin(ctx)) return;
 
        const [userCount, pendingReports, activeChats] = await Promise.all([
               UserModel.countDocuments({}),
@@ -75,7 +100,7 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
 // ══════════════════════════════════════════════════════════
 
 export async function statsHandler(ctx: BotContext): Promise<void> {
-       if (!isAdmin(ctx)) return;
+       if (!await requireAdmin(ctx)) return;
 
        const now = new Date();
        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -121,7 +146,7 @@ export async function statsHandler(ctx: BotContext): Promise<void> {
 // ══════════════════════════════════════════════════════════
 
 export async function reportsHandler(ctx: BotContext): Promise<void> {
-       if (!isAdmin(ctx)) return;
+       if (!await requireAdmin(ctx)) return;
 
        const reports = await ReportModel.getPending();
 
@@ -160,7 +185,7 @@ export async function reportsHandler(ctx: BotContext): Promise<void> {
 // ══════════════════════════════════════════════════════════
 
 export async function banHandler(ctx: BotContext, bot: Telegraf<BotContext>): Promise<void> {
-       if (!isAdmin(ctx)) return;
+       if (!await requireAdmin(ctx)) return;
 
        const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
        const parts = text.split(' ');
@@ -209,7 +234,7 @@ export async function banHandler(ctx: BotContext, bot: Telegraf<BotContext>): Pr
 // ══════════════════════════════════════════════════════════
 
 export async function unbanHandler(ctx: BotContext, bot: Telegraf<BotContext>): Promise<void> {
-       if (!isAdmin(ctx)) return;
+       if (!await requireAdmin(ctx)) return;
 
        const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
        const targetId = Number(text.split(' ')[1]);
@@ -243,7 +268,7 @@ export async function unbanHandler(ctx: BotContext, bot: Telegraf<BotContext>): 
 // ══════════════════════════════════════════════════════════
 
 export async function warnHandler(ctx: BotContext, bot: Telegraf<BotContext>): Promise<void> {
-       if (!isAdmin(ctx)) return;
+       if (!await requireAdmin(ctx)) return;
 
        const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
        const parts = text.split(' ');
@@ -287,7 +312,7 @@ export async function warnHandler(ctx: BotContext, bot: Telegraf<BotContext>): P
 // ══════════════════════════════════════════════════════════
 
 export async function userInfoHandler(ctx: BotContext): Promise<void> {
-       if (!isAdmin(ctx)) return;
+       if (!await requireAdmin(ctx)) return;
 
        const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
        const targetId = Number(text.split(' ')[1]);
@@ -421,7 +446,7 @@ export async function giveCoinHandler(
        ctx: BotContext,
        bot: Telegraf<BotContext>,
 ): Promise<void> {
-       if (!isAdmin(ctx)) return;
+       if (!await requireAdmin(ctx)) return;
 
        const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
        const parts = text.trim().split(/\s+/);
