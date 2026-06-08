@@ -17,7 +17,7 @@
 
 import { Markup, Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { ReportStatus, AUTO_BAN_THRESHOLD } from '@/types/enums';
+import { ReportStatus, AUTO_BAN_THRESHOLD, Gender, UserState } from '@/types/enums';
 import { ReportModel } from '@/models/queue.model';
 import { UserModel } from '@/models/user.model';
 import { mainMenuKeyboard } from '@/lib/keyboards';
@@ -51,7 +51,7 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
        const [userCount, pendingReports, activeChats] = await Promise.all([
               UserModel.countDocuments({}),
               ReportModel.countDocuments({ status: ReportStatus.Pending }),
-              UserModel.countDocuments({ state: 'in_chat' }),
+              UserModel.countDocuments({ state: UserState.InChat }),
        ]);
 
        await ctx.reply(
@@ -95,8 +95,8 @@ export async function statsHandler(ctx: BotContext): Promise<void> {
               UserModel.countDocuments({ registeredAt: { $gte: yesterday } }),
               UserModel.countDocuments({ registeredAt: { $gte: lastWeek } }),
               UserModel.countDocuments({ isBanned: true }),
-              UserModel.countDocuments({ gender: 'male', profileComplete: true }),
-              UserModel.countDocuments({ gender: 'female', profileComplete: true }),
+              UserModel.countDocuments({ gender: Gender.Male, profileComplete: true }),
+              UserModel.countDocuments({ gender: Gender.Female, profileComplete: true }),
               ReportModel.countDocuments({ status: ReportStatus.Pending }),
               ReportModel.countDocuments({}),
        ]);

@@ -9,7 +9,7 @@
 
 import { Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { AUTO_BAN_THRESHOLD, AUTO_WARN_THRESHOLD, CoinChangeReason } from '@/types/enums';
+import { AUTO_BAN_THRESHOLD, AUTO_WARN_THRESHOLD, MessageType } from '@/types/enums';
 import { ReportModel } from '@/models/queue.model';
 import { MessageModel } from '@/models/chat.model';
 import { UserModel } from '@/models/user.model';
@@ -41,7 +41,7 @@ export async function forwardPhotoToAdmin(
 
               // علامت‌گذاری adminCopySent در پیام
               await MessageModel.findOneAndUpdate(
-                     { chatId, senderId, type: 'photo', content: fileId },
+                     { chatId, senderId, type: MessageType.Photo, content: fileId },
                      { $set: { adminCopySent: true } },
               );
        } catch (err) {
