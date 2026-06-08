@@ -8,7 +8,7 @@ import {
        Document,
        Model,
        Types,
-       RootFilterQuery,
+       FilterQuery,
 } from 'mongoose';
 import { Gender, UserState, ProximityKm, COIN_COST_FEMALE_CHAT } from '@/types/enums'
 import type { IranProvince } from '@/types/iran';
