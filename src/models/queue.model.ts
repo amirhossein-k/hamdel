@@ -92,7 +92,7 @@ RandomQueueSchema.statics.enqueue = function (
                      location: extra?.location ?? null,
                      enteredAt: new Date(),
               },
-              { upsert: true, new: true, setDefaultsOnInsert: true },
+              { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
        ).exec();
 };
 

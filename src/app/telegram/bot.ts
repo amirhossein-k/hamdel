@@ -29,7 +29,12 @@ import {
        saveInterests,
        showSettingsMenu,
 } from './handlers/settings';
-import { handleShowIdCallback } from './handlers/profile-browse';
+import {
+       handleViewProfileCallback,
+       handleProfileChatCallback,
+       handleProfileMsgCallback,
+       handleProfileReportCallback,
+} from './handlers/profile-browse';
 
 const bot = new Telegraf<BotContext>(process.env.BOT_TOKEN!);
 
@@ -125,9 +130,24 @@ bot.action(/^admin_report:([^:]+):(warn|ban|dismiss)$/, async (ctx) => {
        await handleReportAction(ctx, bot, reportId, action);
 });
 
-// نمایش آیدی پروفایل
-bot.action(/^show_id:(\d+)$/, async (ctx) => {
-       await handleShowIdCallback(ctx);
+// نمایش پروفایل کامل
+bot.action(/^view_profile:(\d+)$/, async (ctx) => {
+       await handleViewProfileCallback(ctx, bot);
+});
+
+// درخواست چت از صفحه پروفایل
+bot.action(/^profile_chat:(\d+)$/, async (ctx) => {
+       await handleProfileChatCallback(ctx, bot);
+});
+
+// ارسال پیام از صفحه پروفایل
+bot.action(/^profile_msg:(\d+)$/, async (ctx) => {
+       await handleProfileMsgCallback(ctx);
+});
+
+// گزارش از صفحه پروفایل
+bot.action(/^profile_report:(\d+)$/, async (ctx) => {
+       await handleProfileReportCallback(ctx, bot);
 });
 
 // ─── Webhook Handler ──────────────────────────────────────
