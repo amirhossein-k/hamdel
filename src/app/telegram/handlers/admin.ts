@@ -11,7 +11,7 @@
 //  /unban <id>      — آنبن کردن
 //  /warn <id>       — اخطار به کاربر
 //  /userinfo <id>   — اطلاعات کاربر
-//
+//  
 //  Callback:
 //  admin_report:<reportId>:warn|ban|dismiss  — تصمیم روی گزارش
 
