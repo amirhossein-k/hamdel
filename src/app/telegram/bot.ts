@@ -34,7 +34,15 @@ const bot = new Telegraf<BotContext>(process.env.BOT_TOKEN!);
 // ─── Middleware ها ────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-bot.use(session() as any);
+bot.use(
+       session({
+              defaultSession: () => ({
+                     step: undefined,
+              }),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       }) as any,
+);
+
 bot.use(authMiddleware);
 
 // ─── دستورات عمومی ───────────────────────────────────────

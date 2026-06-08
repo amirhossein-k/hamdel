@@ -42,8 +42,7 @@ export function makeMessageRouter(bot: Telegraf<BotContext>) {
 
               // ─── session steps ───────────────────────────────────
 
-              const step = ctx.session.step;
-
+              const step = ctx.session?.step;
               if (step?.startsWith('report:')) {
                      await submitReport(ctx, bot);
                      return;

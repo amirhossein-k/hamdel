@@ -18,6 +18,6 @@ export interface BotSession {
 }
 
 export interface BotContext extends Context {
-       session: BotSession;
+       session?: BotSession;
        dbUser?: IUserDocument;
 }
