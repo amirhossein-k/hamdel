@@ -353,6 +353,139 @@ export async function userInfoHandler(ctx: BotContext): Promise<void> {
        );
 }
 
+// ─── تابع کمکی: ارسال اطلاعات کاربر (مشترک بین userInfoHandler و callback) ──
+
+export async function sendUserInfo(ctx: BotContext, targetId: number): Promise<void> {
+       const [user, reportCount] = await Promise.all([
+              UserModel.findByTelegramId(targetId),
+              ReportModel.countAgainstUser(targetId),
+       ]);
+
+       if (!user) {
+              await ctx.reply('❌ کاربر پیدا نشد.');
+              return;
+       }
+
+       const statusEmoji = user.isBanned ? '🚫' : '✅';
+       const photoStatus = user.photo ? '🖼️ دارد' : '—';
+
+       const infoText =
+              `👤 <b>اطلاعات کاربر</b>\\n\\n` +
+              `🆔 Telegram ID: <code>${user.telegramId}</code>\\n` +
+              `📛 نام: ${user.name ?? '—'}\\n` +
+              `👤 Username: @${user.username ?? '—'}\\n` +
+              `${user.gender === 'male' ? '👦' : '👧'} جنسیت: ${user.gender === 'male' ? 'پسر' : 'دختر'}\\n` +
+              `🎂 سن: ${user.age ?? '—'}\\n` +
+              `📍 ${user.province ?? '—'} — ${user.city ?? '—'}\\n` +
+              `🖼️ عکس پروفایل: ${photoStatus}\\n` +
+              `🪙 سکه: ${user.coins}\\n` +
+              `🔗 دعوت‌شده‌ها: ${user.invitedUsers.length}\\n` +
+              `⚠️ اخطارها: ${user.warnings}\\n` +
+              `🚨 گزارش‌های دریافتی: ${reportCount}\\n` +
+              `${statusEmoji} وضعیت: ${user.isBanned ? `بن شده — ${user.banReason ?? ''}` : 'فعال'}\\n` +
+              `📅 ثبت‌نام: ${user.registeredAt.toLocaleDateString('fa-IR')}\\n` +
+              `🕒 آخرین فعالیت: ${user.lastActive.toLocaleString('fa-IR')}`;
+
+       // دکمه‌های ادمین
+       const buttons = [];
+       if (user.photo) {
+              buttons.push([Markup.button.callback('🖼️ مشاهده عکس پروفایل', `admin_photo_view:${targetId}`)]);
+       }
+       buttons.push([
+              Markup.button.callback('⚠️ اخطار', `admin_quick:${targetId}:warn`),
+              Markup.button.callback('🚫 بن', `admin_quick:${targetId}:ban`),
+       ]);
+       if (user.isBanned) {
+              buttons.push([Markup.button.callback('✅ آنبن', `admin_quick:${targetId}:unban`)]);
+       }
+
+       await ctx.reply(infoText, {
+              parse_mode: 'HTML',
+              ...Markup.inlineKeyboard(buttons),
+       });
+}
+
+
+// ══════════════════════════════════════════════════════════
+//  Callback: مشاهده عکس پروفایل کاربر توسط ادمین
+// ══════════════════════════════════════════════════════════
+
+export async function adminViewPhoto(ctx: BotContext, targetId: number): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+
+       const user = await UserModel.findByTelegramId(targetId);
+
+       if (!user) {
+              await ctx.answerCbQuery('❌ کاربر پیدا نشد.');
+              return;
+       }
+
+       if (!user.photo) {
+              await ctx.answerCbQuery('❌ این کاربر عکس پروفایل ندارد.');
+              return;
+       }
+
+       await ctx.answerCbQuery();
+
+       await ctx.replyWithPhoto(user.photo, {
+              caption:
+                     `🖼️ <b>عکس پروفایل کاربر</b>\\n\\n` +
+                     `👤 نام: ${user.name ?? '—'}\\n` +
+                     `🆔 ID: <code>${user.telegramId}</code>`,
+              parse_mode: 'HTML',
+              ...Markup.inlineKeyboard([
+                     [Markup.button.callback('🗑️ حذف عکس پروفایل', `admin_photo_delete:${targetId}`)],
+                     [Markup.button.callback('🔙 بازگشت به اطلاعات', `admin_userinfo:${targetId}`)],
+              ]),
+       });
+}
+
+// ══════════════════════════════════════════════════════════
+//  Callback: حذف عکس پروفایل کاربر توسط ادمین
+// ══════════════════════════════════════════════════════════
+
+export async function adminDeletePhoto(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+       targetId: number,
+): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+
+       const user = await UserModel.findByTelegramId(targetId);
+
+       if (!user) {
+              await ctx.answerCbQuery('❌ کاربر پیدا نشد.');
+              return;
+       }
+
+       if (!user.photo) {
+              await ctx.answerCbQuery('⚠️ این کاربر عکسی ندارد.');
+              return;
+       }
+
+       user.photo = undefined;
+       await user.save();
+
+       await ctx.answerCbQuery('✅ عکس حذف شد.');
+
+       // ویرایش caption پیام عکس
+       await ctx.editMessageCaption(
+              `🗑️ <b>عکس پروفایل حذف شد</b>\\n\\n` +
+              `👤 نام: ${user.name ?? '—'}\\n` +
+              `🆔 ID: <code>${user.telegramId}</code>\\n\\n` +
+              `✅ عکس توسط ادمین حذف شد.`,
+              { parse_mode: 'HTML' },
+       ).catch(() => { });
+
+       // اطلاع به کاربر
+       await bot.telegram.sendMessage(
+              targetId,
+              `📢 <b>اطلاعیه</b>\\n\\nعکس پروفایل شما توسط مدیریت حذف شد.\\n\\nلطفاً از قوانین استفاده از تصویر رعایت کنید.`,
+              { parse_mode: 'HTML' },
+       ).catch(() => { });
+}
+
+
 // ══════════════════════════════════════════════════════════
 //  Callback: تصمیم روی گزارش (warn | ban | dismiss)
 // ══════════════════════════════════════════════════════════
