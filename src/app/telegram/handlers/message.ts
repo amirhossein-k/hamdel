@@ -24,6 +24,7 @@ import {
        handleEditAge,
        handleEditProvince,
        handleEditCity,
+       handleEditPhoto,
 } from './settings';
 import { showProfileBrowseMenu, handleProfileBrowseStep } from './profile-browse';
 import type { Message } from 'telegraf/types';
@@ -74,6 +75,7 @@ export function makeMessageRouter(bot: Telegraf<BotContext>) {
               if (step === 'settings:age') { await handleEditAge(ctx); return; }
               if (step === 'settings:province') { await handleEditProvince(ctx); return; }
               if (step === 'settings:city') { await handleEditCity(ctx); return; }
+              if (step === 'settings:photo') { await handleEditPhoto(ctx); return; }
 
               // ─── مراحل صف تصادفی ─────────────────────────────────
               if (step?.startsWith('queue:') && text !== null) {

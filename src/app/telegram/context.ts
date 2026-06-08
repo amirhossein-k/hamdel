@@ -12,6 +12,7 @@ export type SessionStep =
        | 'settings:age'
        | 'settings:province'
        | 'settings:city'
+       | 'settings:photo'
        | 'queue:gender_select'     // انتخاب جنسیت طرف مقابل
        | 'queue:smart_search'      // منوی جستجوی انتخابی
        | 'queue:waiting_location'  // انتظار برای دریافت موقعیت مکانی

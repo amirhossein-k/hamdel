@@ -28,6 +28,9 @@ import {
        toggleInterest,
        saveInterests,
        showSettingsMenu,
+       startEditPhoto,
+       deletePhoto,
+       cancelPhotoEdit,
 } from './handlers/settings';
 import {
        handleViewProfileCallback,
@@ -110,6 +113,9 @@ bot.action('settings:name', (ctx) => startEditName(ctx));
 bot.action('settings:age', (ctx) => startEditAge(ctx));
 bot.action('settings:province', (ctx) => startEditProvince(ctx));
 bot.action('settings:interests', (ctx) => showInterests(ctx));
+bot.action('settings:photo', (ctx) => startEditPhoto(ctx));
+bot.action('settings:photo_delete', (ctx) => deletePhoto(ctx));
+bot.action('settings:photo_cancel', (ctx) => cancelPhotoEdit(ctx));
 
 bot.action(/^toggle_interest:(.+)$/, async (ctx) => {
        await toggleInterest(ctx, ctx.match[1]);

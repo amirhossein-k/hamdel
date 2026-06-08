@@ -24,6 +24,7 @@ export function settingsMenuKeyboard() {
               [Markup.button.callback('🎂 ویرایش سن', 'settings:age')],
               [Markup.button.callback('📍 ویرایش استان/شهر', 'settings:province')],
               [Markup.button.callback('🎯 علایق من', 'settings:interests')],
+              [Markup.button.callback('🖼️ عکس پروفایل', 'settings:photo')],
        ]);
 }
 
@@ -53,12 +54,14 @@ export function interestsKeyboard(selected: string[]) {
 
 export async function showSettingsMenu(ctx: BotContext): Promise<void> {
        const user = ctx.dbUser!;
+       const photoStatus = user.photo ? '✅ آپلود شده' : '❌ ندارم';
        await ctx.reply(
               `⚙️ <b>تنظیمات پروفایل</b>\n\n` +
               `📛 نام: ${user.name ?? '—'}\n` +
               `🎂 سن: ${user.age ?? '—'}\n` +
               `📍 ${user.province ?? '—'} — ${user.city ?? '—'}\n` +
-              `🎯 علایق: ${user.interests.length > 0 ? user.interests.join('، ') : '—'}\n\n` +
+              `🎯 علایق: ${user.interests.length > 0 ? user.interests.join('، ') : '—'}\n` +
+              `🖼️ عکس پروفایل: ${photoStatus}\n\n` +
               `چه چیزی می‌خوای ویرایش کنی؟`,
               { parse_mode: 'HTML', ...settingsMenuKeyboard() },
        );
@@ -237,4 +240,96 @@ export async function saveInterests(ctx: BotContext): Promise<void> {
               `✅ <b>علایق ذخیره شد</b>\n\nعلایق شما: ${interestText}`,
               { parse_mode: 'HTML', ...settingsMenuKeyboard() },
        ).catch(() => { });
+}
+
+// ══════════════════════════════════════════════════════════
+//  عکس پروفایل
+// ══════════════════════════════════════════════════════════
+
+export async function startEditPhoto(ctx: BotContext): Promise<void> {
+       const user = ctx.dbUser!;
+       ctx.session.step = 'settings:photo';
+       await ctx.answerCbQuery();
+
+       const hasPhoto = !!user.photo;
+
+       const text = hasPhoto
+              ? `🖼️ <b>عکس پروفایل</b>\n\nعکس فعلیت رو داری.\nعکس جدید بفرست تا جایگزین بشه، یا دکمه «🗑️ حذف عکس» رو بزن.`
+              : `🖼️ <b>عکس پروفایل</b>\n\nهنوز عکس پروفایل نداری.\nیه عکس برام بفرست:`;
+
+       // اگر عکس دارد، ابتدا عکس فعلی را نشان می‌دهیم
+       if (hasPhoto) {
+              await ctx.replyWithPhoto(user.photo!, {
+                     caption: text,
+                     parse_mode: 'HTML',
+                     ...Markup.inlineKeyboard([
+                            [Markup.button.callback('🗑️ حذف عکس', 'settings:photo_delete')],
+                            [Markup.button.callback('🔙 بازگشت', 'settings:photo_cancel')],
+                     ]),
+              });
+       } else {
+              await ctx.reply(text, {
+                     parse_mode: 'HTML',
+                     ...Markup.inlineKeyboard([
+                            [Markup.button.callback('🔙 بازگشت', 'settings:photo_cancel')],
+                     ]),
+              });
+       }
+}
+
+export async function handleEditPhoto(ctx: BotContext): Promise<void> {
+       const user = ctx.dbUser!;
+
+       // بررسی اینکه آیا پیام عکس است
+       if (!ctx.message || !('photo' in ctx.message) || !ctx.message.photo) {
+              await ctx.reply(
+                     '⚠️ لطفاً یه <b>عکس</b> بفرست.\n_(فایل یا لینک قبول نمی‌شه)_',
+                     {
+                            parse_mode: 'HTML',
+                            ...Markup.inlineKeyboard([
+                                   [Markup.button.callback('🔙 بازگشت', 'settings:photo_cancel')],
+                            ]),
+                     },
+              );
+              return;
+       }
+
+       // بهترین کیفیت = آخرین آیتم آرایه photo
+       const bestPhoto = ctx.message.photo[ctx.message.photo.length - 1];
+       const fileId = bestPhoto.file_id;
+
+       user.photo = fileId;
+       await user.save();
+       ctx.session.step = undefined;
+
+       await ctx.replyWithPhoto(fileId, {
+              caption: '✅ <b>عکس پروفایل آپدیت شد!</b>',
+              parse_mode: 'HTML',
+              ...settingsMenuKeyboard(),
+       });
+}
+
+export async function deletePhoto(ctx: BotContext): Promise<void> {
+       const user = ctx.dbUser!;
+
+       if (!user.photo) {
+              await ctx.answerCbQuery('⚠️ عکسی برای حذف وجود نداره.');
+              return;
+       }
+
+       user.photo = undefined;
+       await user.save();
+       ctx.session.step = undefined;
+
+       await ctx.answerCbQuery('🗑️ عکس حذف شد.');
+       await ctx.editMessageCaption('🗑️ عکس پروفایل حذف شد.').catch(async () => {
+              await ctx.reply('🗑️ عکس پروفایل حذف شد.', settingsMenuKeyboard());
+       });
+}
+
+export async function cancelPhotoEdit(ctx: BotContext): Promise<void> {
+       ctx.session.step = undefined;
+       await ctx.answerCbQuery();
+       await ctx.deleteMessage().catch(() => { });
+       await showSettingsMenu(ctx);
 }
