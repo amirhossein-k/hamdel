@@ -10,13 +10,14 @@
 //
 //  نکته: درگاه پرداخت = زرین‌پال (ZARINPAL_MERCHANT_ID در .env)
 
-import { Markup, Telegraf } from 'telegraf';
+import { Markup, Telegraf, Telegram } from 'telegraf';
 import type { BotContext } from '../context';
 import {
        COIN_PACKAGES,
        CoinPackageId,
        CoinChangeReason,
        type CoinPackage,
+       TransactionStatus,
 } from '@/types/enums';
 import { TransactionModel, CoinLogModel } from '@/models/coin.model';
 import { UserModel } from '@/models/user.model';
@@ -114,8 +115,15 @@ export async function initiatePurchase(
                      }),
               });
 
-              const zarinData = await zarinRes.json();
-
+              const zarinData = await zarinRes.json() as {
+                     data?: {
+                            code: number;
+                            authority: string;
+                     };
+                     errors?: {
+                            message?: string;
+                     };
+              };
               if (zarinData.data?.code === 100) {
                      const authority = zarinData.data.authority;
                      const payUrl = `https://www.zarinpal.com/pg/StartPay/${authority}`;
@@ -124,8 +132,9 @@ export async function initiatePurchase(
                      transaction.paymentAuthority = authority;
                      await transaction.save();
 
-                     await ctx.answerCbQuery();
-                     await ctx.editMessageText(
+                     if ('answerCbQuery' in ctx && ctx.callbackQuery) {
+                            await ctx.answerCbQuery();
+                     } await ctx.editMessageText(
                             `💳 *پرداخت ${pkg.coins} سکه*\n\n` +
                             `مبلغ: *${priceFormatted} تومان*\n\n` +
                             `روی دکمه زیر کلیک کن و پرداخت رو انجام بده.\n` +
@@ -168,7 +177,7 @@ export async function verifyAndCreditCoins(
 
        const transaction = await TransactionModel.findById(txId);
        if (!transaction) return { success: false, message: 'تراکنش یافت نشد' };
-       if (transaction.status !== 'pending') return { success: false, message: 'تراکنش قبلاً پردازش شده' };
+       if (transaction.status !== TransactionStatus.Pending) return { success: false, message: 'تراکنش قبلاً پردازش شده' };
 
        // ─── تأیید پرداخت از زرین‌پال ─────────────────────
        if (status !== 'OK') {
@@ -189,8 +198,11 @@ export async function verifyAndCreditCoins(
                      }),
               });
 
-              const verifyData = await verifyRes.json();
-
+              const verifyData = await verifyRes.json() as {
+                     data?: {
+                            code: number;
+                     };
+              };
               if (verifyData.data?.code === 100 || verifyData.data?.code === 101) {
                      // پرداخت موفق
                      await transaction.markPaid(authority);
@@ -207,11 +219,12 @@ export async function verifyAndCreditCoins(
                                    transaction.coins,
                                    CoinChangeReason.Purchase,
                                    user.coins,
-                                   String(transaction._id),
+                                   transaction._id.toString(),
                             );
+                            const telegram = new Telegram(process.env.BOT_TOKEN!);
 
                             // اطلاع به کاربر در تلگرام
-                            await bot.telegram.sendMessage(
+                            await telegram.sendMessage(
                                    user.telegramId,
                                    `✅ *پرداخت موفق!*\n\n` +
                                    `🪙 ${transaction.coins} سکه به حسابت اضافه شد.\n` +
