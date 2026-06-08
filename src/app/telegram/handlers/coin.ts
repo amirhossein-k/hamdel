@@ -63,6 +63,7 @@ export async function showCoinsPage(ctx: BotContext): Promise<void> {
                      [CoinChangeReason.InviteReward]: '🎁 دعوت دوست',
                      [CoinChangeReason.ChatFemale]: '💬 چت',
                      [CoinChangeReason.Refund]: '↩️ بازگشت',
+                     [CoinChangeReason.AdminGift]: '🎁 هدیه ادمین',
               };
               for (const log of logs) {
                      const sign = log.change > 0 ? '+' : '';
