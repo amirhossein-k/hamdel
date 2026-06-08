@@ -89,6 +89,7 @@ export enum CoinChangeReason {
 
 export const COIN_COST_FEMALE_CHAT = 2;
 export const COIN_REWARD_INVITE = 5;
+export const COIN_REWARD_WELCOME = 20;
 export const MIN_AGE = 9;
 export const MAX_AGE = 70;
 export const NEW_USER_DAYS = 7;      // تعریف «کاربر تازه» بر حسب روز

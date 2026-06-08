@@ -12,7 +12,7 @@
 
 import { Markup, Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { UserState, ChatType, ChatRequestStatus } from '@/types/enums';
+import { UserState, ChatType, ChatRequestStatus, Gender, COIN_COST_FEMALE_CHAT } from '@/types/enums';
 import { ChatModel } from '@/models/chat.model';
 import { ChatRequestModel } from '@/models/inbox.model';
 import { UserModel } from '@/models/user.model';
@@ -119,6 +119,19 @@ export async function handleDirectChatSearch(
               return;
        }
 
+       // ─── بررسی سکه: فرستنده پسر + گیرنده دختر ────────────
+       if (user.gender === Gender.Male && target.gender === Gender.Female) {
+              if (user.coins < COIN_COST_FEMALE_CHAT) {
+                     await ctx.reply(
+                            `🪙 برای چت مستقیم با دختر به ${COIN_COST_FEMALE_CHAT} سکه نیاز داری.\n` +
+                            `موجودی فعلی: ${user.coins} سکه\n\n` +
+                            `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
+                            mainMenuKeyboard,
+                     );
+                     return;
+              }
+       }
+
        // ─── ثبت درخواست و ارسال به طرف مقابل ────────────────
 
        await ChatRequestModel.create({
@@ -176,6 +189,27 @@ export async function acceptChatRequest(
 
        // قبول درخواست
        await request.accept();
+
+       // ─── کسر سکه از کسی که درخواست داده ─────────────────
+       const requesterForCoin = await UserModel.findByTelegramId(fromId);
+       if (requesterForCoin && requesterForCoin.gender === Gender.Male && user.gender === Gender.Female) {
+              if (requesterForCoin.coins < COIN_COST_FEMALE_CHAT) {
+                     // سکه کافی ندارد — درخواست را رد کن
+                     await request.reject();
+                     await ctx.answerCbQuery('❌ فرستنده سکه کافی ندارد.');
+                     await ctx.editMessageText('❌ درخواست لغو شد — فرستنده سکه کافی ندارد.').catch(() => { });
+                     try {
+                            await bot.telegram.sendMessage(
+                                   fromId,
+                                   `❌ درخواست چت مستقیم لغو شد.\n\nسکه کافی نداری. برای خرید «🪙 سکه‌هام» رو بزن.`,
+                                   mainMenuKeyboard,
+                            );
+                     } catch { }
+                     return;
+              }
+              requesterForCoin.coins -= COIN_COST_FEMALE_CHAT;
+              await requesterForCoin.save();
+       }
 
        // ساخت چت
        const chatId = nanoid(12);

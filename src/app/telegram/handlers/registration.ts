@@ -4,7 +4,7 @@
 
 import type { Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { UserState, Gender, MIN_AGE, MAX_AGE } from '@/types/enums';
+import { UserState, Gender, MIN_AGE, MAX_AGE, COIN_REWARD_WELCOME } from '@/types/enums';
 import { rewardInviter } from './invite';
 import { IRAN_PROVINCES, isCityInProvince } from '@/types/iran';
 import type { IranProvince } from '@/types/iran';
@@ -135,6 +135,7 @@ export async function handleRegistrationStep(ctx: BotContext, bot?: Telegraf<Bot
                      user.city = text;
                      user.state = UserState.Complete;
                      user.profileComplete = true;
+                     user.coins += COIN_REWARD_WELCOME;
                      await user.save();
 
                      // ─── پاداش دعوت ──────────────────────────────────────
@@ -148,8 +149,9 @@ export async function handleRegistrationStep(ctx: BotContext, bot?: Telegraf<Bot
                             `${user.gender === Gender.Male ? '👦' : '👧'} جنسیت: ${user.gender === Gender.Male ? 'پسر' : 'دختر'}\n` +
                             `🎂 سن: ${user.age}\n` +
                             `📍 استان: ${user.province} — ${user.city}\n\n` +
+                            `🎁 <b>${COIN_REWARD_WELCOME} سکه هدیه خوش‌آمدگویی</b> به حسابت اضافه شد!\n\n` +
                             `حالا می‌تونی شروع کنی! 🎉`,
-                            mainMenuKeyboard
+                            { parse_mode: 'HTML', ...mainMenuKeyboard },
                      );
                      break;
               }

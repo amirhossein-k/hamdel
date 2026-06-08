@@ -310,6 +310,42 @@ export async function joinRandomQueue(
               return;
        }
 
+       // ─── بررسی سکه قبل از ورود به صف ────────────────────
+       // اگر پسر است و targetGender دختر است: قطعاً سکه نیاز دارد
+       // اگر targetGender = Any یا جستجوی انتخابی: ممکن است با دختر مچ شود،
+       // پس باید حداقل COIN_COST_FEMALE_CHAT سکه داشته باشد
+       if (user.gender === Gender.Male) {
+              if (targetGender === TargetGender.Female) {
+                     // حتماً با دختر مچ می‌شود — سکه لازم است
+                     if (!user.hasEnoughCoinsForFemaleChat()) {
+                            await ctx.reply(
+                                   `🪙 برای چت با دختر به ${COIN_COST_FEMALE_CHAT} سکه نیاز داری.\n` +
+                                   `موجودی فعلی: ${user.coins} سکه\n\n` +
+                                   `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
+                                   mainMenuKeyboard,
+                            );
+                            return;
+                     }
+              } else if (targetGender === TargetGender.Any ||
+                     searchMode === SearchMode.SameProvince ||
+                     searchMode === SearchMode.SameAge ||
+                     searchMode === SearchMode.Nearby) {
+                     // ممکن است با دختر مچ شود — باید سکه کافی داشته باشد
+                     if (!user.hasEnoughCoinsForFemaleChat()) {
+                            await ctx.reply(
+                                   `⚠️ موجودی سکه‌ات کمه!
+
+` +
+                                   `ممکنه با یه دختر مچ بشی. برای اون حالت به ${COIN_COST_FEMALE_CHAT} سکه نیاز داری.\n` +
+                                   `موجودی فعلی: ${user.coins} سکه\n\n` +
+                                   `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
+                                   mainMenuKeyboard,
+                            );
+                            return;
+                     }
+              }
+       }
+
        // ─── ساخت extra برای searchMode ─────────────────────
        const extra: {
               province?: string;
@@ -343,7 +379,9 @@ export async function joinRandomQueue(
                      return;
               }
 
-              // ─── بررسی سکه: پسر + دختر ──────────────────────
+              // ─── بررسی و کسر سکه: پسر + دختر ───────────────
+              // فقط برای پسرانی که با دختر مچ شدند
+              // (در حالت Any/انتخابی، جنسیت پارتنر هنگام مچ مشخص می‌شود)
               if (user.gender === Gender.Male && partner.gender === Gender.Female) {
                      if (!user.hasEnoughCoinsForFemaleChat()) {
                             await RandomQueueModel.dequeue(user.telegramId);
@@ -353,6 +391,9 @@ export async function joinRandomQueue(
                                    `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
                                    mainMenuKeyboard,
                             );
+                            // کاربر را در صف نگه نمی‌داریم — state را برمی‌گردانیم
+                            user.state = UserState.Complete;
+                            await user.save();
                             return;
                      }
                      user.coins -= COIN_COST_FEMALE_CHAT;
