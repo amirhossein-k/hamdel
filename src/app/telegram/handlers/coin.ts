@@ -192,13 +192,33 @@ export async function verifyAndCreditCoins(
 
        const transaction = await TransactionModel.findById(txId);
        if (!transaction) return { success: false, message: 'تراکنش یافت نشد' };
-       if (transaction.status !== TransactionStatus.Pending) return { success: false, message: 'تراکنش قبلاً پردازش شده' };
-
+       // if (transaction.status !== TransactionStatus.Pending) return { success: false, message: 'تراکنش قبلاً پردازش شده' };
+       if (
+              transaction.status ===
+              TransactionStatus.Paid
+       ) {
+              return {
+                     success: true,
+                     message: 'already paid',
+              };
+       }
+       if (
+              transaction.status ===
+              TransactionStatus.Failed
+       ) {
+              console.log(
+                     'Retrying failed transaction'
+              );
+       }
        // ─── تأیید پرداخت از زرین‌پال ─────────────────────
        if (status !== 'OK') {
               await transaction.markFailed();
               return { success: false, message: 'پرداخت لغو شد' };
        }
+       console.log('=== VERIFY AND CREDIT COINS ===');
+       console.log('txId:', txId);
+       console.log('authority:', authority);
+       console.log('status:', status);
        // 
        try {
               const pkg = COIN_PACKAGES.find((p) => p.id === transaction.package)!;

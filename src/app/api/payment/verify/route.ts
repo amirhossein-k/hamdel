@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
 
        const status =
               req.nextUrl.searchParams.get('Status');
-
+       console.log('=== VERIFY START ===');
+       console.log('authority:', authority);
+       console.log('status:', status);
+       console.log('merchant:', process.env.ZARINPAL_MERCHANT_ID);
        if (!authority) {
               return NextResponse.redirect(
                      new URL('/payment/failed', req.url),
