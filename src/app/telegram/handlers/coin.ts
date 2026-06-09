@@ -123,7 +123,6 @@ export async function initiatePurchase(
                             amount: pkg.price * 10, // تبدیل تومان به ریال
                             description: `خرید ${pkg.coins} سکه در هم‌دل`,
                             callback_url: callbackUrl,
-                            metadata: { mobile: '', email: '' },
                      }),
               });
 
@@ -136,6 +135,10 @@ export async function initiatePurchase(
                             message?: string;
                      };
               };
+              console.log(
+                     'Zarinpal Response:',
+                     JSON.stringify(zarinData, null, 2),
+              );
               if (zarinData.data?.code === 100) {
                      const authority = zarinData.data.authority;
                      const payUrl = `https://www.zarinpal.com/pg/StartPay/${authority}`;
