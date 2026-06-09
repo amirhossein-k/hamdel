@@ -19,6 +19,12 @@ import {
        giveCoinHandler,
        handleReportAction,
        isAdmin,
+       usersListHandler,
+       adminUserInfoCallback,
+       adminQuickAction,
+       adminViewPhoto,
+       adminDeletePhoto,
+       sendUserInfo,
 } from './handlers/admin';
 import {
        startEditName,
@@ -71,6 +77,7 @@ bot.command('unban', (ctx) => unbanHandler(ctx, bot));
 bot.command('warn', (ctx) => warnHandler(ctx, bot));
 bot.command('userinfo', (ctx) => userInfoHandler(ctx));
 bot.command('givecoin', (ctx) => giveCoinHandler(ctx, bot));
+bot.command('users', (ctx) => usersListHandler(ctx, 0));
 
 // ─── روتر عمومی پیام‌ها (باید آخر باشد) ──────────────────
 bot.on('message', makeMessageRouter(bot));
@@ -129,31 +136,47 @@ bot.action('settings:back', async (ctx) => {
        await showSettingsMenu(ctx);
 });
 
-// پنل ادمین — تصمیم روی گزارش
+// ─── پنل ادمین ────────────────────────────────────────────
+
+// تصمیم روی گزارش
 bot.action(/^admin_report:([^:]+):(warn|ban|dismiss)$/, async (ctx) => {
        const reportId = ctx.match[1];
        const action = ctx.match[2] as 'warn' | 'ban' | 'dismiss';
        await handleReportAction(ctx, bot, reportId, action);
 });
 
-// نمایش پروفایل کامل
-bot.action(/^view_profile:(\d+)$/, async (ctx) => {
-       await handleViewProfileCallback(ctx, bot);
+// صفحه‌بندی لیست کاربران
+bot.action(/^admin_users_page:(\d+)$/, async (ctx) => {
+       await usersListHandler(ctx, Number(ctx.match[1]));
 });
 
-// درخواست چت از صفحه پروفایل
-bot.action(/^profile_chat:(\d+)$/, async (ctx) => {
-       await handleProfileChatCallback(ctx, bot);
+// باز کردن پروفایل کاربر از لیست
+bot.action(/^admin_userinfo:(\d+)$/, async (ctx) => {
+       await adminUserInfoCallback(ctx, Number(ctx.match[1]));
 });
 
-// ارسال پیام از صفحه پروفایل
-bot.action(/^profile_msg:(\d+)$/, async (ctx) => {
-       await handleProfileMsgCallback(ctx);
+// مشاهده عکس پروفایل
+bot.action(/^admin_photo_view:(\d+)$/, async (ctx) => {
+       await adminViewPhoto(ctx, Number(ctx.match[1]));
 });
 
-// گزارش از صفحه پروفایل
-bot.action(/^profile_report:(\d+)$/, async (ctx) => {
-       await handleProfileReportCallback(ctx, bot);
+// حذف عکس پروفایل
+bot.action(/^admin_photo_delete:(\d+)$/, async (ctx) => {
+       await adminDeletePhoto(ctx, bot, Number(ctx.match[1]));
+});
+
+// بازگشت به اطلاعات کاربر از صفحه عکس
+bot.action(/^admin_userinfo_back:(\d+)$/, async (ctx) => {
+       await ctx.answerCbQuery();
+       await ctx.deleteMessage().catch(() => { });
+       await sendUserInfo(ctx, Number(ctx.match[1]));
+});
+
+// اقدام سریع (warn/ban/unban) از پروفایل کاربر
+bot.action(/^admin_quick:(\d+):(warn|ban|unban)$/, async (ctx) => {
+       const targetId = Number(ctx.match[1]);
+       const action = ctx.match[2] as 'warn' | 'ban' | 'unban';
+       await adminQuickAction(ctx, bot, targetId, action);
 });
 
 // ─── Webhook Handler ──────────────────────────────────────

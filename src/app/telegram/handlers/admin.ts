@@ -87,6 +87,7 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
               `دستورات:\n` +
               `/stats — آمار کامل\n` +
               `/reports — بررسی گزارش‌ها\n` +
+              `/users — لیست کاربران\n` +
               `/ban &lt;telegramId&gt; — بن کاربر\n` +
               `/unban &lt;telegramId&gt; — آنبن کاربر\n` +
               `/warn &lt;telegramId&gt; — اخطار\n` +
@@ -370,20 +371,20 @@ export async function sendUserInfo(ctx: BotContext, targetId: number): Promise<v
        const photoStatus = user.photo ? '🖼️ دارد' : '—';
 
        const infoText =
-              `👤 <b>اطلاعات کاربر</b>\\n\\n` +
-              `🆔 Telegram ID: <code>${user.telegramId}</code>\\n` +
-              `📛 نام: ${user.name ?? '—'}\\n` +
-              `👤 Username: @${user.username ?? '—'}\\n` +
-              `${user.gender === 'male' ? '👦' : '👧'} جنسیت: ${user.gender === 'male' ? 'پسر' : 'دختر'}\\n` +
-              `🎂 سن: ${user.age ?? '—'}\\n` +
-              `📍 ${user.province ?? '—'} — ${user.city ?? '—'}\\n` +
-              `🖼️ عکس پروفایل: ${photoStatus}\\n` +
-              `🪙 سکه: ${user.coins}\\n` +
-              `🔗 دعوت‌شده‌ها: ${user.invitedUsers.length}\\n` +
-              `⚠️ اخطارها: ${user.warnings}\\n` +
-              `🚨 گزارش‌های دریافتی: ${reportCount}\\n` +
-              `${statusEmoji} وضعیت: ${user.isBanned ? `بن شده — ${user.banReason ?? ''}` : 'فعال'}\\n` +
-              `📅 ثبت‌نام: ${user.registeredAt.toLocaleDateString('fa-IR')}\\n` +
+              `👤 <b>اطلاعات کاربر</b>\n\n` +
+              `🆔 Telegram ID: <code>${user.telegramId}</code>\n` +
+              `📛 نام: ${user.name ?? '—'}\n` +
+              `👤 Username: @${user.username ?? '—'}\n` +
+              `${user.gender === 'male' ? '👦' : '👧'} جنسیت: ${user.gender === 'male' ? 'پسر' : 'دختر'}\n` +
+              `🎂 سن: ${user.age ?? '—'}\n` +
+              `📍 ${user.province ?? '—'} — ${user.city ?? '—'}\n` +
+              `🖼️ عکس پروفایل: ${photoStatus}\n` +
+              `🪙 سکه: ${user.coins}\n` +
+              `🔗 دعوت‌شده‌ها: ${user.invitedUsers.length}\n` +
+              `⚠️ اخطارها: ${user.warnings}\n` +
+              `🚨 گزارش‌های دریافتی: ${reportCount}\n` +
+              `${statusEmoji} وضعیت: ${user.isBanned ? `بن شده — ${user.banReason ?? ''}` : 'فعال'}\n` +
+              `📅 ثبت‌نام: ${user.registeredAt.toLocaleDateString('fa-IR')}\n` +
               `🕒 آخرین فعالیت: ${user.lastActive.toLocaleString('fa-IR')}`;
 
        // دکمه‌های ادمین
@@ -429,13 +430,13 @@ export async function adminViewPhoto(ctx: BotContext, targetId: number): Promise
 
        await ctx.replyWithPhoto(user.photo, {
               caption:
-                     `🖼️ <b>عکس پروفایل کاربر</b>\\n\\n` +
-                     `👤 نام: ${user.name ?? '—'}\\n` +
+                     `🖼️ <b>عکس پروفایل کاربر</b>\n\n` +
+                     `👤 نام: ${user.name ?? '—'}\n` +
                      `🆔 ID: <code>${user.telegramId}</code>`,
               parse_mode: 'HTML',
               ...Markup.inlineKeyboard([
                      [Markup.button.callback('🗑️ حذف عکس پروفایل', `admin_photo_delete:${targetId}`)],
-                     [Markup.button.callback('🔙 بازگشت به اطلاعات', `admin_userinfo:${targetId}`)],
+                     [Markup.button.callback('🔙 بازگشت به اطلاعات', `admin_userinfo_back:${targetId}`)],
               ]),
        });
 }
@@ -470,9 +471,9 @@ export async function adminDeletePhoto(
 
        // ویرایش caption پیام عکس
        await ctx.editMessageCaption(
-              `🗑️ <b>عکس پروفایل حذف شد</b>\\n\\n` +
-              `👤 نام: ${user.name ?? '—'}\\n` +
-              `🆔 ID: <code>${user.telegramId}</code>\\n\\n` +
+              `🗑️ <b>عکس پروفایل حذف شد</b>\n\n` +
+              `👤 نام: ${user.name ?? '—'}\n` +
+              `🆔 ID: <code>${user.telegramId}</code>\n\n` +
               `✅ عکس توسط ادمین حذف شد.`,
               { parse_mode: 'HTML' },
        ).catch(() => { });
@@ -480,7 +481,7 @@ export async function adminDeletePhoto(
        // اطلاع به کاربر
        await bot.telegram.sendMessage(
               targetId,
-              `📢 <b>اطلاعیه</b>\\n\\nعکس پروفایل شما توسط مدیریت حذف شد.\\n\\nلطفاً از قوانین استفاده از تصویر رعایت کنید.`,
+              `📢 <b>اطلاعیه</b>\n\nعکس پروفایل شما توسط مدیریت حذف شد.\n\nلطفاً از قوانین استفاده از تصویر رعایت کنید.`,
               { parse_mode: 'HTML' },
        ).catch(() => { });
 }
@@ -662,4 +663,128 @@ export async function giveCoinHandler(
        await bot.telegram
               .sendMessage(targetId, userMsg, { parse_mode: 'HTML' })
               .catch(() => { });
+}
+// ══════════════════════════════════════════════════════════
+//  /users — لیست کشویی کاربران (صفحه‌بندی شده)
+// ══════════════════════════════════════════════════════════
+
+const USERS_PAGE_SIZE = 8;
+
+export async function usersListHandler(ctx: BotContext, page = 0): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+
+       const total = await UserModel.countDocuments({ profileComplete: true });
+       const users = await UserModel.find({ profileComplete: true })
+              .sort({ registeredAt: -1 })
+              .skip(page * USERS_PAGE_SIZE)
+              .limit(USERS_PAGE_SIZE)
+              .lean();
+
+       if (users.length === 0) {
+              await ctx.reply('❌ کاربری پیدا نشد.');
+              return;
+       }
+
+       const totalPages = Math.ceil(total / USERS_PAGE_SIZE);
+
+       // ─── دکمه‌های لیست کاربران ────────────────────────────
+       const userButtons = users.map((u) => {
+              const genderIcon = u.gender === 'male' ? '👦' : '👧';
+              const banIcon = u.isBanned ? '🚫' : '';
+              const photoIcon = u.photo ? '🖼️' : '';
+              const label = `${genderIcon}${banIcon}${photoIcon} ${u.name ?? '—'} | ${u.age ?? '—'} | ${u.city ?? u.province ?? '—'}`;
+              return [Markup.button.callback(label, `admin_userinfo:${u.telegramId}`)];
+       });
+
+       // ─── دکمه‌های صفحه‌بندی ───────────────────────────────
+       const navButtons: ReturnType<typeof Markup.button.callback>[] = [];
+       if (page > 0)
+              navButtons.push(Markup.button.callback('◀️ قبلی', `admin_users_page:${page - 1}`));
+       if (page < totalPages - 1)
+              navButtons.push(Markup.button.callback('بعدی ▶️', `admin_users_page:${page + 1}`));
+
+       const keyboard = navButtons.length > 0
+              ? Markup.inlineKeyboard([...userButtons, navButtons])
+              : Markup.inlineKeyboard(userButtons);
+
+       const header =
+              `👥 <b>لیست کاربران</b>\n\n` +
+              `📊 کل: ${total} کاربر | صفحه ${page + 1} از ${totalPages}\n\n` +
+              `راهنما: 👦/👧 جنسیت | 🚫 بن‌شده | 🖼️ دارای عکس`;
+
+       if (ctx.callbackQuery) {
+              await ctx.editMessageText(header, { parse_mode: 'HTML', ...keyboard }).catch(async () => {
+                     await ctx.reply(header, { parse_mode: 'HTML', ...keyboard });
+              });
+              await ctx.answerCbQuery();
+       } else {
+              await ctx.reply(header, { parse_mode: 'HTML', ...keyboard });
+       }
+}
+
+// ══════════════════════════════════════════════════════════
+//  Callback: نمایش اطلاعات کاربر از لیست
+// ══════════════════════════════════════════════════════════
+
+export async function adminUserInfoCallback(ctx: BotContext, targetId: number): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+       await ctx.answerCbQuery();
+       await sendUserInfo(ctx, targetId);
+}
+
+// ══════════════════════════════════════════════════════════
+//  Callback: اقدام سریع روی کاربر (warn/ban/unban)
+// ══════════════════════════════════════════════════════════
+
+export async function adminQuickAction(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+       targetId: number,
+       action: 'warn' | 'ban' | 'unban',
+): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+
+       const user = await UserModel.findByTelegramId(targetId);
+       if (!user) {
+              await ctx.answerCbQuery('❌ کاربر پیدا نشد.');
+              return;
+       }
+
+       if (action === 'warn') {
+              user.warnings += 1;
+              const autoBan = user.warnings >= AUTO_BAN_THRESHOLD;
+              if (autoBan) {
+                     user.isBanned = true;
+                     user.banReason = `بن خودکار پس از ${user.warnings} اخطار`;
+              }
+              await user.save();
+              await ctx.answerCbQuery(`⚠️ اخطار ${user.warnings} ثبت شد.`);
+              await bot.telegram.sendMessage(
+                     targetId,
+                     `⚠️ <b>اخطار ${user.warnings}</b>\n\nرفتار نامناسب گزارش شده. در صورت تکرار بن خواهید شد.`,
+                     { parse_mode: 'HTML' },
+              ).catch(() => { });
+
+       } else if (action === 'ban') {
+              user.isBanned = true;
+              user.banReason = 'بن توسط ادمین';
+              await user.save();
+              await ctx.answerCbQuery('🚫 کاربر بن شد.');
+              await bot.telegram.sendMessage(targetId, '🚫 حساب شما مسدود شد.').catch(() => { });
+
+       } else if (action === 'unban') {
+              user.isBanned = false;
+              user.banReason = undefined;
+              await user.save();
+              await ctx.answerCbQuery('✅ کاربر آنبن شد.');
+              await bot.telegram.sendMessage(
+                     targetId,
+                     '✅ مسدودیت حساب شما رفع شد.',
+                     mainMenuKeyboard,
+              ).catch(() => { });
+       }
+
+       // رفرش اطلاعات کاربر
+       await ctx.deleteMessage().catch(() => { });
+       await sendUserInfo(ctx, targetId);
 }
