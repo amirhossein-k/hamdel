@@ -1,18 +1,12 @@
 // src/app/telegram/handlers/profile-browse.ts
-// ─── مرور و نمایش پروفایل کاربران ───────────────────────────────────────────
-//
-//  جریان:
-//  1. کاربر «👥 جستجو براساس پروفایل» → منوی انتخاب فیلتر
-//  2. فیلتر براساس استان یا جنسیت → لیست کارت‌های کوچک
-//  3. هر کارت یک دکمه «👁 مشاهده پروفایل» دارد (با profileId منحصربه‌فرد)
-//  4. با زدن آن → پروفایل کامل + دکمه‌های درخواست چت / پیام / گزارش
+// ─── مرور و نمایش پروفایل کاربران ────────────────────────
 
 import { Markup, Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { Gender, ChatRequestStatus, UserState } from '@/types/enums';
+import { Gender, ChatRequestStatus, UserState, CoinChangeReason, COIN_COST_CHAT } from '@/types/enums';
 import { UserModel } from '@/models/user.model';
-import { ChatRequestModel } from '@/models/inbox.model';
-import { DirectMessageModel } from '@/models/inbox.model';
+import { ChatRequestModel, DirectMessageModel } from '@/models/inbox.model';
+import { CoinLogModel } from '@/models/coin.model';
 import {
        mainMenuKeyboard,
        profileBrowseKeyboard,
@@ -22,9 +16,9 @@ import {
 import type { IranProvince } from '@/types/iran';
 import { IRAN_PROVINCES } from '@/types/iran';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 5;
 
-// ─── تبدیل تاریخ به «چه مدت پیش» ─────────────────────────
+// ─── helpers ──────────────────────────────────────────────
 
 function timeAgo(date: Date): string {
        const diff = Date.now() - date.getTime();
@@ -92,7 +86,7 @@ export async function handleProfileBrowseStep(
                      return true;
               }
               ctx.session.step = undefined;
-              await showProfilesByProvince(ctx, province);
+              await showProfileList(ctx, { province }, `🗺️ استان ${province}`);
               return true;
        }
 
@@ -110,11 +104,12 @@ export async function handleProfileBrowseStep(
                      return true;
               }
               ctx.session.step = undefined;
-              await showProfilesByGender(ctx, gender);
+              const label = gender === Gender.Male ? '👦 پسرها' : '👧 دخترها';
+              await showProfileList(ctx, { gender }, label);
               return true;
        }
 
-       // ─── مرحله ارسال پیام به کاربر از پروفایل ────────────
+       // ─── ارسال پیام مستقیم ────────────────────────────────
        if (step?.startsWith('profile:send_msg:')) {
               const targetId = Number(step.split(':')[2]);
               ctx.session.step = undefined;
@@ -131,24 +126,20 @@ export async function handleProfileBrowseStep(
                      return true;
               }
 
-              // ذخیره پیام در inbox
               await DirectMessageModel.create({
                      fromId: sender.telegramId,
                      toId: targetId,
                      content: text,
               });
 
-              // اطلاع‌رسانی به گیرنده
               try {
                      await ctx.telegram.sendMessage(
                             targetId,
                             `📩 <b>پیام جدید</b> از ${sender.name ?? 'یک کاربر'}:\n\n${text}\n\n` +
-                            `برای پاسخ: «💬 چت مستقیم» را بزن و کد دعوت <code>${sender.inviteCode}</code> را وارد کن.`,
+                            `برای پاسخ: «💬 چت مستقیم» را بزن و کد <code>${sender.inviteCode}</code> را وارد کن.`,
                             { parse_mode: 'HTML' },
                      );
-              } catch {
-                     // کاربر ربات را بلاک کرده
-              }
+              } catch { /* کاربر ربات را بلاک کرده */ }
 
               await ctx.reply('✅ پیام ارسال شد.', mainMenuKeyboard);
               return true;
@@ -158,63 +149,118 @@ export async function handleProfileBrowseStep(
 }
 
 // ══════════════════════════════════════════════════════════
-//  نمایش لیست پروفایل‌ها براساس استان
+//  نمایش لیست کشویی پروفایل‌ها (با pagination)
 // ══════════════════════════════════════════════════════════
 
-async function showProfilesByProvince(ctx: BotContext, province: IranProvince): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function showProfileList(ctx: BotContext, filter: any, title: string, page = 0): Promise<void> {
        const me = ctx.dbUser!;
-       const users = await UserModel.find({
-              province,
+
+       const query = {
+              ...filter,
               profileComplete: true,
               isBanned: false,
               telegramId: { $ne: me.telegramId },
-       }).sort({ lastActive: -1 }).limit(PAGE_SIZE).lean().exec();
+       };
 
-       if (users.length === 0) {
-              await ctx.reply(`😕 در استان <b>${province}</b> کاربری یافت نشد.`,
-                     { parse_mode: 'HTML', reply_markup: mainMenuKeyboard.reply_markup });
+       const total = await UserModel.countDocuments(query);
+
+       if (total === 0) {
+              await ctx.reply(
+                     `😕 در دسته <b>${title}</b> کاربری یافت نشد.`,
+                     { parse_mode: 'HTML', reply_markup: mainMenuKeyboard.reply_markup },
+              );
               return;
        }
-       await ctx.reply(`🗺️ <b>پروفایل‌های استان ${province}</b> — ${users.length} نفر`,
-              { parse_mode: 'HTML', reply_markup: mainMenuKeyboard.reply_markup });
-       for (const u of users) await sendProfileCard(ctx, u);
-}
 
-// ══════════════════════════════════════════════════════════
-//  نمایش لیست پروفایل‌ها براساس جنسیت
-// ══════════════════════════════════════════════════════════
+       const users = await UserModel
+              .find(query)
+              .sort({ lastActive: -1 })
+              .skip(page * PAGE_SIZE)
+              .limit(PAGE_SIZE)
+              .lean()
+              .exec();
 
-async function showProfilesByGender(ctx: BotContext, gender: Gender): Promise<void> {
-       const me = ctx.dbUser!;
-       const label = gender === Gender.Male ? '👦 پسرها' : '👧 دخترها';
-       const users = await UserModel.find({
-              gender,
-              profileComplete: true,
-              isBanned: false,
-              telegramId: { $ne: me.telegramId },
-       }).sort({ lastActive: -1 }).limit(PAGE_SIZE).lean().exec();
+       const totalPages = Math.ceil(total / PAGE_SIZE);
+       const hasNext = page < totalPages - 1;
+       const hasPrev = page > 0;
 
-       if (users.length === 0) {
-              await ctx.reply(`😕 هیچ کاربری در دسته <b>${label}</b> یافت نشد.`,
-                     { parse_mode: 'HTML', reply_markup: mainMenuKeyboard.reply_markup });
-              return;
+       // ─── هدر لیست ──────────────────────────────────────
+       await ctx.reply(
+              `👥 <b>${title}</b>\n📊 ${total} کاربر — صفحه ${page + 1} از ${totalPages}`,
+              { parse_mode: 'HTML', reply_markup: mainMenuKeyboard.reply_markup },
+       );
+
+       // ─── کارت هر کاربر ──────────────────────────────────
+       for (const u of users) {
+              await sendProfileCard(ctx, u);
        }
-       await ctx.reply(`⚧️ <b>پروفایل‌های ${label}</b> — ${users.length} نفر`,
-              { parse_mode: 'HTML', reply_markup: mainMenuKeyboard.reply_markup });
-       for (const u of users) await sendProfileCard(ctx, u);
+
+       // ─── دکمه‌های صفحه‌بندی ─────────────────────────────
+       if (totalPages > 1) {
+              const navButtons = [];
+              if (hasPrev) navButtons.push(
+                     Markup.button.callback('⬅️ قبلی', `browse_page:${JSON.stringify(filter)}:${title}:${page - 1}`)
+              );
+              if (hasNext) navButtons.push(
+                     Markup.button.callback('➡️ بعدی', `browse_page:${JSON.stringify(filter)}:${title}:${page + 1}`)
+              );
+
+              if (navButtons.length > 0) {
+                     await ctx.reply(
+                            `📄 صفحه ${page + 1} از ${totalPages}`,
+                            Markup.inlineKeyboard([navButtons]),
+                     );
+              }
+       }
 }
 
-// ══════════════════════════════════════════════════════════
-//  کارت کوچک پروفایل (در لیست)
-// ══════════════════════════════════════════════════════════
+// callback handler برای pagination
+export async function handleBrowsePageCallback(ctx: BotContext): Promise<void> {
+       await ctx.answerCbQuery();
+       if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
+
+       // data format: browse_page:{filter}:{title}:{page}
+       const raw = ctx.callbackQuery.data;
+       const prefix = 'browse_page:';
+       const body = raw.slice(prefix.length);
+
+       // آخرین دو : را جدا کن
+       const lastColon = body.lastIndexOf(':');
+       const page = Number(body.slice(lastColon + 1));
+       const rest = body.slice(0, lastColon);
+       const secondLast = rest.lastIndexOf(':');
+       const title = rest.slice(secondLast + 1);
+       const filterStr = rest.slice(0, secondLast);
+
+       try {
+              const filter = JSON.parse(filterStr);
+              await showProfileList(ctx, filter, title, page);
+       } catch {
+              await ctx.reply('⚠️ خطا در بارگذاری صفحه. دوباره تلاش کن.');
+       }
+}
+
+// ──────────────────────────────────────────────────────────
+//  کارت کوچک پروفایل
+// ──────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function sendProfileCard(ctx: BotContext, u: any): Promise<void> {
        const icon = u.gender === 'male' ? '👦' : '👧';
-       const text = `${icon} <b>${u.name ?? '—'}</b> | ${u.age ?? '—'} سال | ${u.city ?? u.province ?? '—'}`;
-       const kb = Markup.inlineKeyboard([
+       const interests = u.interests?.length ? u.interests.slice(0, 3).join(' • ') : '—';
+       const onlineStatus = timeAgo(new Date(u.lastActive));
+
+       const text =
+              `${icon} <b>${u.name ?? '—'}</b>\n` +
+              `🎂 ${u.age ?? '—'} سال  |  📍 ${u.city ?? u.province ?? '—'}\n` +
+              `🎯 ${interests}\n` +
+              `🕐 ${onlineStatus}`;
+
+       const kb = Markup.inlineKeyboard([[
               Markup.button.callback('👁 مشاهده پروفایل', `view_profile:${u.telegramId}`),
-       ]);
+       ]]);
+
        if (u.photo) {
               await ctx.replyWithPhoto(u.photo, {
                      caption: text,
@@ -222,15 +268,12 @@ async function sendProfileCard(ctx: BotContext, u: any): Promise<void> {
                      ...kb,
               });
        } else {
-              await ctx.reply(text, {
-                     parse_mode: 'HTML',
-                     ...kb,
-              });
+              await ctx.reply(text, { parse_mode: 'HTML', ...kb });
        }
 }
 
 // ══════════════════════════════════════════════════════════
-//  نمایش پروفایل کامل (callback: view_profile:ID)
+//  نمایش پروفایل کامل  (callback: view_profile:ID)
 // ══════════════════════════════════════════════════════════
 
 export async function handleViewProfileCallback(
@@ -238,9 +281,10 @@ export async function handleViewProfileCallback(
        bot: Telegraf<BotContext>,
 ): Promise<void> {
        await ctx.answerCbQuery();
-
        if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
+
        const targetId = Number(ctx.callbackQuery.data.split(':')[1]);
+       if (!targetId) return;
 
        const target = await UserModel.findByTelegramId(targetId);
        if (!target || target.isBanned || !target.profileComplete) {
@@ -250,50 +294,48 @@ export async function handleViewProfileCallback(
 
        const me = ctx.dbUser!;
        const genderText = target.gender === 'male' ? '👦 پسر' : '👧 دختر';
-       const interests = target.interests.length > 0 ? target.interests.join(' ') : '—';
+       const interests = target.interests?.length ? target.interests.join(' • ') : '—';
        const onlineStatus = timeAgo(target.lastActive);
 
        const profileText =
               `👤 <b>پروفایل کاربر</b>\n\n` +
               `📛 نام: <b>${target.name ?? '—'}</b>\n` +
-              `${genderText}\n` +
-              `🎂 سن: ${target.age ?? '—'}\n` +
-              `📍 استان: ${target.province ?? '—'}\n` +
-              `🏙️ شهر: ${target.city ?? '—'}\n` +
+              `${genderText}  |  🎂 ${target.age ?? '—'} سال\n` +
+              `📍 ${target.province ?? '—'} — ${target.city ?? '—'}\n` +
               `🎯 علایق: ${interests}\n` +
-              `🕐 آخرین آنلاین: ${onlineStatus}\n`;
+              `🕐 آخرین آنلاین: ${onlineStatus}`;
 
-       // دکمه‌ها — برای خودت دکمه چت و پیام و گزارش نشون نده
-       const buttons =
-              me.telegramId === targetId
-                     ? []
-                     : [
-                            [
-                                   Markup.button.callback('💬 درخواست چت', `profile_chat:${targetId}`),
-                                   Markup.button.callback('📩 ارسال پیام', `profile_msg:${targetId}`),
-                            ],
-                            [
-                                   Markup.button.callback('🚨 گزارش کاربر', `profile_report:${targetId}`),
-                            ],
-                     ];
+       const isSelf = me.telegramId === targetId;
+       const isFemale = target.gender === Gender.Female;
+       const coinLabel = isFemale ? ` (۲🪙)` : '';
 
-       const inlineKb = Markup.inlineKeyboard(buttons);
+       const buttons = isSelf ? [] : [
+              [
+                     Markup.button.callback(`💬 درخواست چت${coinLabel}`, `profile_chat:${targetId}`),
+                     Markup.button.callback('📩 ارسال پیام', `profile_msg:${targetId}`),
+              ],
+              [Markup.button.callback('🚨 گزارش کاربر', `profile_report:${targetId}`)],
+       ];
+
+       const kb = Markup.inlineKeyboard(buttons);
+
        if (target.photo) {
               await ctx.replyWithPhoto(target.photo, {
                      caption: profileText,
                      parse_mode: 'HTML',
-                     ...inlineKb,
+                     ...kb,
               });
        } else {
-              await ctx.reply(profileText, {
-                     parse_mode: 'HTML',
-                     ...inlineKb,
-              });
+              await ctx.reply(profileText, { parse_mode: 'HTML', ...kb });
        }
 }
 
 // ══════════════════════════════════════════════════════════
-//  درخواست چت از صفحه پروفایل (callback: profile_chat:ID)
+//  درخواست چت از پروفایل  (callback: profile_chat:ID)
+//  قوانین سکه:
+//   - اگر طرف مقابل دختر است → ۲ سکه از فرستنده کسر می‌شود
+//   - اگر طرف مقابل پیام را قبول نکرد (بلاک) → سکه برمی‌گردد
+//   - جستجوی تصادفی مشمول نمی‌شود (این handler نیست)
 // ══════════════════════════════════════════════════════════
 
 export async function handleProfileChatCallback(
@@ -317,7 +359,21 @@ export async function handleProfileChatCallback(
               return;
        }
 
-       // بررسی درخواست تکراری
+       // ─── بررسی و کسر سکه ─────────────────────────────────
+       const needsCoin = target.gender === Gender.Female;
+       if (needsCoin) {
+              if (me.coins < COIN_COST_CHAT) {
+                     await ctx.reply(
+                            `🪙 برای چت با دختر به <b>${COIN_COST_CHAT} سکه</b> نیاز داری.\n` +
+                            `موجودی فعلی: ${me.coins} سکه\n\n` +
+                            `برای خرید «🪙 سکه‌هام» را بزن.`,
+                            { parse_mode: 'HTML' },
+                     );
+                     return;
+              }
+       }
+
+       // ─── بررسی درخواست تکراری ────────────────────────────
        const existing = await ChatRequestModel.findOne({
               fromId: me.telegramId,
               toId: targetId,
@@ -328,14 +384,28 @@ export async function handleProfileChatCallback(
               return;
        }
 
-       // ثبت درخواست
+       // ─── کسر سکه پیش از ارسال پیام ──────────────────────
+       if (needsCoin) {
+              me.coins -= COIN_COST_CHAT;
+              await me.save();
+              await CoinLogModel.record(
+                     me.telegramId,
+                     -COIN_COST_CHAT,
+                     CoinChangeReason.ChatFemale,
+                     me.coins,
+                     String(targetId),
+              );
+       }
+
+       // ─── ثبت درخواست ─────────────────────────────────────
        await ChatRequestModel.create({
               fromId: me.telegramId,
               toId: targetId,
               status: ChatRequestStatus.Pending,
        });
 
-       // ارسال به هدف
+       // ─── ارسال پیام به هدف ───────────────────────────────
+       let sent = false;
        try {
               await bot.telegram.sendMessage(
                      targetId,
@@ -344,21 +414,51 @@ export async function handleProfileChatCallback(
                      {
                             parse_mode: 'HTML',
                             ...Markup.inlineKeyboard([
-                                   Markup.button.callback('✅ قبول', `accept_chat:${me.telegramId}`),
-                                   Markup.button.callback('❌ رد', `reject_chat:${me.telegramId}`),
+                                   [
+                                          Markup.button.callback('✅ قبول', `accept_chat:${me.telegramId}`),
+                                          Markup.button.callback('❌ رد', `reject_chat:${me.telegramId}`),
+                                   ],
                             ]),
                      },
               );
+              sent = true;
        } catch {
+              sent = false;
+       }
+
+       // ─── برگشت سکه اگر پیام ارسال نشد ──────────────────
+       if (!sent && needsCoin) {
+              me.coins += COIN_COST_CHAT;
+              await me.save();
+              await CoinLogModel.record(
+                     me.telegramId,
+                     +COIN_COST_CHAT,
+                     CoinChangeReason.Refund,
+                     me.coins,
+                     String(targetId),
+              );
+              await ctx.reply(
+                     '⚠️ پیام به کاربر ارسال نشد (احتمالاً ربات را بلاک کرده).\n' +
+                     `🪙 <b>${COIN_COST_CHAT} سکه</b> به حسابت برگشت.`,
+                     { parse_mode: 'HTML' },
+              );
+              return;
+       }
+
+       if (!sent) {
               await ctx.reply('⚠️ پیام به کاربر ارسال نشد. ممکنه ربات رو بلاک کرده باشه.');
               return;
        }
 
-       await ctx.reply('✅ درخواست چت ارسال شد. منتظر پاسخ باش.', mainMenuKeyboard);
+       const coinMsg = needsCoin ? `\n🪙 <b>${COIN_COST_CHAT} سکه</b> کسر شد. موجودی: ${me.coins}` : '';
+       await ctx.reply(
+              `✅ درخواست چت ارسال شد. منتظر پاسخ باش.${coinMsg}`,
+              { parse_mode: 'HTML', reply_markup: mainMenuKeyboard.reply_markup },
+       );
 }
 
 // ══════════════════════════════════════════════════════════
-//  ارسال پیام مستقیم از صفحه پروفایل (callback: profile_msg:ID)
+//  ارسال پیام مستقیم از پروفایل  (callback: profile_msg:ID)
 // ══════════════════════════════════════════════════════════
 
 export async function handleProfileMsgCallback(ctx: BotContext): Promise<void> {
@@ -366,17 +466,13 @@ export async function handleProfileMsgCallback(ctx: BotContext): Promise<void> {
        if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
 
        const targetId = Number(ctx.callbackQuery.data.split(':')[1]);
-       const me = ctx.dbUser!;
-
        const target = await UserModel.findByTelegramId(targetId);
        if (!target || target.isBanned) {
               await ctx.reply('⚠️ این کاربر در دسترس نیست.');
               return;
        }
 
-       // ذخیره مرحله در session
        ctx.session.step = `profile:send_msg:${targetId}`;
-
        await ctx.reply(
               `📩 پیامت رو برای <b>${target.name ?? 'این کاربر'}</b> بنویس:\n\n(برای انصراف «❌ انصراف» بزن)`,
               {
@@ -387,7 +483,7 @@ export async function handleProfileMsgCallback(ctx: BotContext): Promise<void> {
 }
 
 // ══════════════════════════════════════════════════════════
-//  گزارش از صفحه پروفایل (callback: profile_report:ID)
+//  گزارش از پروفایل  (callback: profile_report:ID)
 // ══════════════════════════════════════════════════════════
 
 export async function handleProfileReportCallback(
@@ -399,14 +495,11 @@ export async function handleProfileReportCallback(
 
        const targetId = Number(ctx.callbackQuery.data.split(':')[1]);
        const me = ctx.dbUser!;
-
        if (me.telegramId === targetId) return;
 
-       // استفاده از همان مکانیزم گزارش چت — chatId خالی
        ctx.session.step = `report:${targetId}:profile`;
-
        await ctx.reply(
-              '🚨 دلیل گزارش رو بنویس:\n\n(مثلاً: تصویر پروفایل نامناسب، رفتار آزاردهنده، ...)',
+              '🚨 دلیل گزارش رو بنویس:\n\n(مثلاً: تصویر نامناسب، رفتار آزاردهنده، ...)',
               { reply_markup: { remove_keyboard: true } },
        );
 }

@@ -46,6 +46,7 @@ import {
        handleProfileChatCallback,
        handleProfileMsgCallback,
        handleProfileReportCallback,
+       handleBrowsePageCallback,
 } from './handlers/profile-browse';
 
 const bot = new Telegraf<BotContext>(process.env.BOT_TOKEN!);
@@ -100,6 +101,13 @@ bot.action(/^accept_chat:(\d+)$/, async (ctx) => {
        await acceptChatRequest(ctx, bot, Number(ctx.match[1]));
 });
 
+
+// ─── Profile browse callbacks ─────────────────────────────
+bot.action(/^view_profile:(\d+)$/, (ctx) => handleViewProfileCallback(ctx, bot));
+bot.action(/^profile_chat:(\d+)$/, (ctx) => handleProfileChatCallback(ctx, bot));
+bot.action(/^profile_msg:(\d+)$/, (ctx) => handleProfileMsgCallback(ctx));
+bot.action(/^profile_report:(\d+)$/, (ctx) => handleProfileReportCallback(ctx, bot));
+bot.action(/^browse_page:/, (ctx) => handleBrowsePageCallback(ctx));
 bot.action(/^reject_chat:(\d+)$/, async (ctx) => {
        await rejectChatRequest(ctx, bot, Number(ctx.match[1]));
 });

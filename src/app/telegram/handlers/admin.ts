@@ -92,7 +92,8 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
               `/unban &lt;telegramId&gt; — آنبن کاربر\n` +
               `/warn &lt;telegramId&gt; — اخطار\n` +
               `/userinfo &lt;telegramId&gt; — اطلاعات کاربر\n` +
-              `/givecoin &lt;telegramId&gt; &lt;مقدار&gt; — اهدای سکه\n` +
+              `/givecoin &lt;telegramId&gt; &lt;مقدار&gt; — اهدای سکه به یک کاربر\n` +
+              `/giveall &lt;مقدار&gt; — اهدای سکه به همه کاربران\n` +
               `/broadcast — ارسال پیام کلی به همه کاربران`,
               { parse_mode: 'HTML' },
        );
@@ -916,4 +917,164 @@ export async function broadcastCancelHandler(ctx: BotContext): Promise<void> {
 
        await ctx.answerCbQuery('❌ لغو شد.');
        await ctx.editMessageText('❌ ارسال پیام کلی لغو شد.').catch(() => { });
+}
+
+// ══════════════════════════════════════════════════════════
+//  /giveall <amount> — اهدای سکه به همه کاربران
+// ══════════════════════════════════════════════════════════
+
+export async function giveAllHandler(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+
+       const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+       const parts = text.trim().split(/\s+/);
+
+       if (parts.length < 2) {
+              await ctx.reply(
+                     '❌ فرمت نادرست.\n\n' +
+                     'استفاده صحیح:\n' +
+                     '<code>/giveall &lt;مقدار&gt;</code>\n\n' +
+                     'مثال: <code>/giveall 10</code>\n' +
+                     '(به تمام کاربران ثبت‌نام‌شده ۱۰ سکه می‌دهد)',
+                     { parse_mode: 'HTML' },
+              );
+              return;
+       }
+
+       const amount = Number(parts[1]);
+
+       if (!Number.isInteger(amount) || amount <= 0) {
+              await ctx.reply('❌ مقدار باید یک عدد صحیح مثبت باشد.');
+              return;
+       }
+
+       // پیام تأیید با تعداد کاربران
+       const userCount = await UserModel.countDocuments({
+              profileComplete: true,
+              isBanned: false,
+       });
+
+       if (userCount === 0) {
+              await ctx.reply('❌ کاربر واجد شرایطی وجود ندارد.');
+              return;
+       }
+
+       // درخواست تأیید
+       await ctx.reply(
+              `⚠️ <b>تأیید عملیات</b>\n\n` +
+              `🪙 مقدار هدیه: <b>${amount} سکه</b>\n` +
+              `👥 تعداد کاربران: <b>${userCount} نفر</b>\n` +
+              `🏦 مجموع توزیع: <b>${amount * userCount} سکه</b>\n\n` +
+              `آیا ادامه می‌دهید؟`,
+              {
+                     parse_mode: 'HTML',
+                     reply_markup: {
+                            inline_keyboard: [[
+                                   { text: '✅ بله، ارسال شود', callback_data: `giveall_confirm:${amount}` },
+                                   { text: '❌ انصراف', callback_data: 'giveall_cancel' },
+                            ]],
+                     },
+              },
+       );
+}
+
+// ─── Callback: تأیید giveall ───────────────────────────────
+
+export async function giveAllConfirmHandler(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+
+       await ctx.answerCbQuery();
+
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       const data = (ctx.callbackQuery as any)?.data ?? '';
+       const amount = Number(data.split(':')[1]);
+
+       if (!Number.isInteger(amount) || amount <= 0) {
+              await ctx.editMessageText('❌ مقدار نامعتبر است.');
+              return;
+       }
+
+       // پیام «در حال پردازش»
+       await ctx.editMessageText(
+              `⏳ <b>در حال ارسال سکه به همه کاربران...</b>\n\nلطفاً صبر کنید.`,
+              { parse_mode: 'HTML' },
+       );
+
+       const { CoinLogModel } = await import('@/models/coin.model');
+       const { CoinChangeReason } = await import('@/types/enums');
+
+       // دریافت تمام کاربران واجد شرایط
+       const users = await UserModel.find(
+              { profileComplete: true, isBanned: false },
+              { telegramId: 1, coins: 1, name: 1 },
+       ).lean();
+
+       let successCount = 0;
+       let failCount = 0;
+
+       // پردازش دسته‌ای (batch) — هر ۱۰۰ تا یک‌جا
+       const BATCH = 100;
+       for (let i = 0; i < users.length; i += BATCH) {
+              const batch = users.slice(i, i + BATCH);
+
+              // آپدیت coins به صورت bulk
+              const bulkOps = batch.map((u) => ({
+                     updateOne: {
+                            filter: { telegramId: u.telegramId },
+                            update: { $inc: { coins: amount } },
+                     },
+              }));
+              await UserModel.bulkWrite(bulkOps);
+
+              // ثبت لاگ و اطلاع‌رسانی به هر کاربر
+              for (const u of batch) {
+                     const balanceAfter = (u.coins ?? 0) + amount;
+
+                     // لاگ سکه
+                     await CoinLogModel.record(
+                            u.telegramId,
+                            amount,
+                            CoinChangeReason.AdminGift,
+                            balanceAfter,
+                            'broadcast',
+                     ).catch(() => { });
+
+                     // پیام به کاربر
+                     const sent = await bot.telegram
+                            .sendMessage(
+                                   u.telegramId,
+                                   `🎁 <b>${amount} سکه هدیه دریافت کردی!</b>\n\n` +
+                                   `این هدیه از طرف تیم هم‌دل به حسابت اضافه شد.\n` +
+                                   `موجودی فعلی: <b>${balanceAfter} سکه</b> 🪙`,
+                                   { parse_mode: 'HTML' },
+                            )
+                            .then(() => true)
+                            .catch(() => false);   // کاربر ربات را بلاک کرده
+
+                     if (sent) successCount++; else failCount++;
+              }
+       }
+
+       // گزارش نهایی به ادمین
+       await ctx.reply(
+              `✅ <b>عملیات تکمیل شد</b>\n\n` +
+              `🪙 مقدار هدیه: <b>${amount} سکه</b>\n` +
+              `📨 ارسال موفق: <b>${successCount} نفر</b>\n` +
+              `🔕 بلاک‌شده / خطا: <b>${failCount} نفر</b>`,
+              { parse_mode: 'HTML' },
+       );
+}
+
+// ─── Callback: لغو giveall ────────────────────────────────
+
+export async function giveAllCancelHandler(ctx: BotContext): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+       await ctx.answerCbQuery('لغو شد');
+       await ctx.editMessageText('❌ عملیات لغو شد.');
 }
