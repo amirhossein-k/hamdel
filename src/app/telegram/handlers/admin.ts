@@ -92,7 +92,8 @@ export async function adminMenuHandler(ctx: BotContext): Promise<void> {
               `/unban &lt;telegramId&gt; — آنبن کاربر\n` +
               `/warn &lt;telegramId&gt; — اخطار\n` +
               `/userinfo &lt;telegramId&gt; — اطلاعات کاربر\n` +
-              `/givecoin &lt;telegramId&gt; &lt;مقدار&gt; — اهدای سکه`,
+              `/givecoin &lt;telegramId&gt; &lt;مقدار&gt; — اهدای سکه\n` +
+              `/broadcast — ارسال پیام کلی به همه کاربران`,
               { parse_mode: 'HTML' },
        );
 }
@@ -787,4 +788,132 @@ export async function adminQuickAction(
        // رفرش اطلاعات کاربر
        await ctx.deleteMessage().catch(() => { });
        await sendUserInfo(ctx, targetId);
+}
+// ══════════════════════════════════════════════════════════
+//  /broadcast — پیام کلی به همه کاربران
+// ══════════════════════════════════════════════════════════
+//
+//  جریان:
+//  1. ادمین /broadcast می‌زند
+//  2. session.step = 'admin:broadcast' می‌شود
+//  3. ادمین متن پیام را می‌فرستد
+//  4. تأییدیه با تعداد کاربران نشان داده می‌شود
+//  5. ادمین ✅ تأیید یا ❌ لغو می‌زند
+//  6. پیام به تمام کاربران ارسال می‌شود (با delay برای جلوگیری از rate limit)
+
+export async function broadcastStartHandler(ctx: BotContext): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+
+       const userCount = await UserModel.countDocuments({ isBanned: false, profileComplete: true });
+
+       ctx.session.step = 'admin:broadcast';
+       await ctx.reply(
+              `📢 <b>ارسال پیام کلی</b>\n\n` +
+              `تعداد کاربران فعال: <b>${userCount} نفر</b>\n\n` +
+              `متن پیامی که می‌خوای به همه ارسال بشه رو بنویس:\n` +
+              `(از HTML می‌تونی استفاده کنی — مثل <code>&lt;b&gt;متن&lt;/b&gt;</code>)\n\n` +
+              `برای لغو /cancel بزن.`,
+              { parse_mode: 'HTML', reply_markup: { remove_keyboard: true } },
+       );
+}
+
+export async function broadcastConfirmHandler(ctx: BotContext): Promise<void> {
+       if (!await requireAdmin(ctx)) return;
+
+       const text = ctx.message && 'text' in ctx.message ? ctx.message.text.trim() : null;
+       if (!text) return;
+
+       // ذخیره متن پیام در session برای مرحله بعد
+       ctx.session.broadcastText = text;
+       ctx.session.step = 'admin:broadcast_confirm';
+
+       const userCount = await UserModel.countDocuments({ isBanned: false, profileComplete: true });
+
+       await ctx.reply(
+              `📋 <b>پیش‌نمایش پیام:</b>\n\n` +
+              `${text}\n\n` +
+              `─────────────────\n` +
+              `👥 ارسال به: <b>${userCount} کاربر</b>\n\n` +
+              `آیا مطمئنی؟`,
+              {
+                     parse_mode: 'HTML',
+                     ...Markup.inlineKeyboard([
+                            [
+                                   Markup.button.callback('✅ تأیید و ارسال', 'broadcast_confirm'),
+                                   Markup.button.callback('❌ لغو', 'broadcast_cancel'),
+                            ],
+                     ]),
+              },
+       );
+}
+
+export async function broadcastSendHandler(
+       ctx: BotContext,
+       bot: Telegraf<BotContext>,
+): Promise<void> {
+       if (!await requireAdmin(ctx)) {
+              await ctx.answerCbQuery('❌ دسترسی ندارید.');
+              return;
+       }
+
+       const message = ctx.session.broadcastText;
+       if (!message) {
+              await ctx.answerCbQuery('❌ متن پیام یافت نشد.');
+              return;
+       }
+
+       ctx.session.step = undefined;
+       ctx.session.broadcastText = undefined;
+
+       await ctx.answerCbQuery('🚀 در حال ارسال...');
+       await ctx.editMessageText('⏳ در حال ارسال پیام به همه کاربران...').catch(() => { });
+
+       // دریافت همه کاربران فعال
+       const users = await UserModel.find(
+              { isBanned: false, profileComplete: true },
+              { telegramId: 1 },
+       ).lean();
+
+       let successCount = 0;
+       let failCount = 0;
+
+       const adminHeader = `📢 <b>پیام از تیم هم‌دل:</b>\n\n`;
+       const fullMessage = adminHeader + message;
+
+       for (const user of users) {
+              try {
+                     await bot.telegram.sendMessage(user.telegramId, fullMessage, {
+                            parse_mode: 'HTML',
+                     });
+                     successCount++;
+              } catch {
+                     // کاربر ربات را بلاک کرده یا حذف کرده
+                     failCount++;
+              }
+
+              // delay برای جلوگیری از rate limit تلگرام (30 پیام در ثانیه)
+              if (successCount % 25 === 0) {
+                     await new Promise((r) => setTimeout(r, 1000));
+              }
+       }
+
+       await ctx.reply(
+              `✅ <b>ارسال پیام کلی تمام شد</b>\n\n` +
+              `📤 ارسال موفق: <b>${successCount} نفر</b>\n` +
+              `❌ ارسال ناموفق (بلاک): <b>${failCount} نفر</b>`,
+              { parse_mode: 'HTML' },
+       );
+}
+
+export async function broadcastCancelHandler(ctx: BotContext): Promise<void> {
+       if (!await requireAdmin(ctx)) {
+              await ctx.answerCbQuery();
+              return;
+       }
+
+       ctx.session.step = undefined;
+       ctx.session.broadcastText = undefined;
+
+       await ctx.answerCbQuery('❌ لغو شد.');
+       await ctx.editMessageText('❌ ارسال پیام کلی لغو شد.').catch(() => { });
 }

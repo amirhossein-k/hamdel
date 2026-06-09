@@ -25,6 +25,9 @@ import {
        adminViewPhoto,
        adminDeletePhoto,
        sendUserInfo,
+       broadcastStartHandler,
+       broadcastSendHandler,
+       broadcastCancelHandler,
 } from './handlers/admin';
 import {
        startEditName,
@@ -76,6 +79,14 @@ bot.command('ban', (ctx) => banHandler(ctx, bot));
 bot.command('unban', (ctx) => unbanHandler(ctx, bot));
 bot.command('warn', (ctx) => warnHandler(ctx, bot));
 bot.command('userinfo', (ctx) => userInfoHandler(ctx));
+bot.command('broadcast', (ctx) => broadcastStartHandler(ctx));
+bot.command('cancel', async (ctx) => {
+       if (ctx.session.step?.startsWith('admin:')) {
+              ctx.session.step = undefined;
+              ctx.session.broadcastText = undefined;
+              await ctx.reply('❌ لغو شد.');
+       }
+});
 bot.command('givecoin', (ctx) => giveCoinHandler(ctx, bot));
 bot.command('users', (ctx) => usersListHandler(ctx, 0));
 
@@ -137,6 +148,10 @@ bot.action('settings:back', async (ctx) => {
 });
 
 // ─── پنل ادمین ────────────────────────────────────────────
+
+// broadcast
+bot.action('broadcast_confirm', (ctx) => broadcastSendHandler(ctx, bot));
+bot.action('broadcast_cancel', (ctx) => broadcastCancelHandler(ctx));
 
 // تصمیم روی گزارش
 bot.action(/^admin_report:([^:]+):(warn|ban|dismiss)$/, async (ctx) => {

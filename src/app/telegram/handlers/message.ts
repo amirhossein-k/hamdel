@@ -28,6 +28,7 @@ import {
 } from './settings';
 import { showProfileBrowseMenu, handleProfileBrowseStep } from './profile-browse';
 import type { Message } from 'telegraf/types';
+import { broadcastConfirmHandler } from './admin';
 
 // ─── متن پیام ────────────────────────────────────────────
 
@@ -60,6 +61,11 @@ export function makeMessageRouter(bot: Telegraf<BotContext>) {
               // ─── session steps ───────────────────────────────────
 
               const step = ctx.session?.step;
+
+              if (step === 'admin:broadcast') {
+                     await broadcastConfirmHandler(ctx);
+                     return;
+              }
 
               if (step?.startsWith('report:')) {
                      await submitReport(ctx, bot);

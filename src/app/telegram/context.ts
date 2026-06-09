@@ -22,6 +22,7 @@ export type SessionStep =
        | undefined;
 
 export interface BotSession {
+       broadcastText?: string;                // متن پیام کلی در انتظار تأیید
        step?: SessionStep | string;
        pendingTargetGender?: TargetGender;   // نگهداری موقت انتخاب جنسیت
        pendingSearchMode?: SearchMode;        // نگهداری موقت نوع جستجو
