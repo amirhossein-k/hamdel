@@ -115,7 +115,7 @@ export async function initiatePurchase(
        );
        console.log('Package:', packageId);
        try {
-              const zarinRes = await fetch('https://payment.zarinpal.com/pg/v4/payment/request.json', {
+              const zarinRes = await fetch('https://payment.zarinpal.com/pg/v4/payment/ssrequest.json', {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/json' },
                      body: JSON.stringify({
