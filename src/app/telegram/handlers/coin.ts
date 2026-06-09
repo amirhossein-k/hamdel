@@ -105,7 +105,7 @@ export async function initiatePurchase(
        );
        // ─── ساخت لینک پرداخت زرین‌پال ───────────────────
        const callbackUrl =
-              `${process.env.APP_URL}/api/payment/verify`;
+              'https://marloo.shop/api/hamdel-payment-callback';
 
        console.log('=== PAYMENT START ===');
        console.log('APP_URL:', process.env.APP_URL);
