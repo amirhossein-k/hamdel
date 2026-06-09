@@ -99,12 +99,23 @@ export async function initiatePurchase(
 
        const pkg = COIN_PACKAGES.find((p) => p.id === packageId)!;
        const priceFormatted = pkg.price.toLocaleString('fa-IR');
-
+       console.log(
+              'merchant:',
+              process.env.ZARINPAL_MERCHANT_ID
+       );
        // ─── ساخت لینک پرداخت زرین‌پال ───────────────────
        const callbackUrl =
               `${process.env.APP_URL}/api/payment/verify`;
+
+       console.log('=== PAYMENT START ===');
+       console.log('APP_URL:', process.env.APP_URL);
+       console.log(
+              'MERCHANT:',
+              process.env.ZARINPAL_MERCHANT_ID,
+       );
+       console.log('Package:', packageId);
        try {
-              const zarinRes = await fetch('https://api.zarinpal.com/pg/v4/payment/request.json', {
+              const zarinRes = await fetch('https://payment.zarinpal.com/pg/v4/payment/request.json', {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/json' },
                      body: JSON.stringify({

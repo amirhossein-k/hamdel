@@ -1,10 +1,9 @@
+// src\app\api\payment\verify\route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 import { connectDB } from '@/lib/mongodb';
 import { TransactionModel } from '@/models/coin.model';
 import { verifyAndCreditCoins } from '@/app/telegram/handlers/coin';
-import { Telegraf } from 'telegraf';
-import { BotContext } from '@/app/telegram/context';
 
 export async function GET(req: NextRequest) {
        await connectDB();
