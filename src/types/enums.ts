@@ -88,6 +88,8 @@ export enum CoinChangeReason {
 // ─── ثابت‌های کسب‌وکار ───────────────────────
 
 export const COIN_COST_FEMALE_CHAT = 2;
+// هزینه چت برای همه حالت‌های غیرتصادفی (جنسیت انتخابی، جستجوی انتخابی، چت مستقیم)
+export const COIN_COST_CHAT = 2;
 export const COIN_REWARD_INVITE = 5;
 export const COIN_REWARD_WELCOME = 20;
 export const MIN_AGE = 9;

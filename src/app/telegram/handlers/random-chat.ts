@@ -18,7 +18,7 @@ import {
        Gender,
        ChatType,
        MessageType,
-       COIN_COST_FEMALE_CHAT,
+       COIN_COST_CHAT,
        TargetGender,
        SearchMode,
 } from '@/types/enums';
@@ -311,39 +311,23 @@ export async function joinRandomQueue(
        }
 
        // ─── بررسی سکه قبل از ورود به صف ────────────────────
-       // اگر پسر است و targetGender دختر است: قطعاً سکه نیاز دارد
-       // اگر targetGender = Any یا جستجوی انتخابی: ممکن است با دختر مچ شود،
-       // پس باید حداقل COIN_COST_FEMALE_CHAT سکه داشته باشد
-       if (user.gender === Gender.Male) {
-              if (targetGender === TargetGender.Female) {
-                     // حتماً با دختر مچ می‌شود — سکه لازم است
-                     if (!user.hasEnoughCoinsForFemaleChat()) {
-                            await ctx.reply(
-                                   `🪙 برای چت با دختر به ${COIN_COST_FEMALE_CHAT} سکه نیاز داری.\n` +
-                                   `موجودی فعلی: ${user.coins} سکه\n\n` +
-                                   `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
-                                   mainMenuKeyboard,
-                            );
-                            return;
-                     }
-              } else if (targetGender === TargetGender.Any ||
-                     searchMode === SearchMode.SameProvince ||
-                     searchMode === SearchMode.SameAge ||
-                     searchMode === SearchMode.Nearby) {
-                     // ممکن است با دختر مچ شود — باید سکه کافی داشته باشد
-                     if (!user.hasEnoughCoinsForFemaleChat()) {
-                            await ctx.reply(
-                                   `⚠️ موجودی سکه‌ات کمه!
+       //
+       //  قانون:
+       //  • GenderSelect + Any  → تصادفی، رایگان
+       //  • GenderSelect + Male/Female → جنسیت‌دار، ۲ سکه
+       //  • SameProvince / SameAge / Nearby → جستجوی انتخابی، ۲ سکه
 
-` +
-                                   `ممکنه با یه دختر مچ بشی. برای اون حالت به ${COIN_COST_FEMALE_CHAT} سکه نیاز داری.\n` +
-                                   `موجودی فعلی: ${user.coins} سکه\n\n` +
-                                   `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
-                                   mainMenuKeyboard,
-                            );
-                            return;
-                     }
-              }
+       const isRandomFree =
+              searchMode === SearchMode.GenderSelect && targetGender === TargetGender.Any;
+
+       if (!isRandomFree && user.coins < COIN_COST_CHAT) {
+              await ctx.reply(
+                     `🪙 برای این نوع جستجو به ${COIN_COST_CHAT} سکه نیاز داری.\n` +
+                     `موجودی فعلی: ${user.coins} سکه\n\n` +
+                     `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
+                     mainMenuKeyboard,
+              );
+              return;
        }
 
        // ─── ساخت extra برای searchMode ─────────────────────
@@ -379,24 +363,17 @@ export async function joinRandomQueue(
                      return;
               }
 
-              // ─── بررسی و کسر سکه: پسر + دختر ───────────────
-              // فقط برای پسرانی که با دختر مچ شدند
-              // (در حالت Any/انتخابی، جنسیت پارتنر هنگام مچ مشخص می‌شود)
-              if (user.gender === Gender.Male && partner.gender === Gender.Female) {
-                     if (!user.hasEnoughCoinsForFemaleChat()) {
-                            await RandomQueueModel.dequeue(user.telegramId);
-                            await ctx.reply(
-                                   `🪙 برای چت با دختر به ${COIN_COST_FEMALE_CHAT} سکه نیاز داری.\n` +
-                                   `موجودی فعلی: ${user.coins} سکه\n\n` +
-                                   `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
-                                   mainMenuKeyboard,
-                            );
-                            // کاربر را در صف نگه نمی‌داریم — state را برمی‌گردانیم
-                            user.state = UserState.Complete;
-                            await user.save();
-                            return;
-                     }
-                     user.coins -= COIN_COST_FEMALE_CHAT;
+              // ─── کسر سکه هنگام مچ ────────────────────────────
+              //
+              //  قانون:
+              //  • تصادفی (GenderSelect + Any)  → رایگان، هیچ سکه‌ای کم نمی‌شود
+              //  • بقیه حالت‌ها                 → ۲ سکه از کاربری که ورود کرد
+              //
+              //  چون قبل از ورود به صف سکه کافی چک شد،
+              //  اینجا فقط کسر می‌کنیم و نیازی به re-check نیست.
+
+              if (!isRandomFree) {
+                     user.coins -= COIN_COST_CHAT;
                      await user.save();
               }
 

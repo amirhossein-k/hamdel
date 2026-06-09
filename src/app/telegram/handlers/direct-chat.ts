@@ -12,7 +12,7 @@
 
 import { Markup, Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { UserState, ChatType, ChatRequestStatus, Gender, COIN_COST_FEMALE_CHAT } from '@/types/enums';
+import { UserState, ChatType, ChatRequestStatus, COIN_COST_CHAT } from '@/types/enums';
 import { ChatModel } from '@/models/chat.model';
 import { ChatRequestModel } from '@/models/inbox.model';
 import { UserModel } from '@/models/user.model';
@@ -119,17 +119,16 @@ export async function handleDirectChatSearch(
               return;
        }
 
-       // ─── بررسی سکه: فرستنده پسر + گیرنده دختر ────────────
-       if (user.gender === Gender.Male && target.gender === Gender.Female) {
-              if (user.coins < COIN_COST_FEMALE_CHAT) {
-                     await ctx.reply(
-                            `🪙 برای چت مستقیم با دختر به ${COIN_COST_FEMALE_CHAT} سکه نیاز داری.\n` +
-                            `موجودی فعلی: ${user.coins} سکه\n\n` +
-                            `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
-                            mainMenuKeyboard,
-                     );
-                     return;
-              }
+       // ─── بررسی سکه قبل از ارسال درخواست ──────────────────
+       //  قانون: درخواست‌دهنده باید ۲ سکه داشته باشد (همه حالت‌ها)
+       if (user.coins < COIN_COST_CHAT) {
+              await ctx.reply(
+                     `🪙 برای چت مستقیم به ${COIN_COST_CHAT} سکه نیاز داری.\n` +
+                     `موجودی فعلی: ${user.coins} سکه\n\n` +
+                     `برای خرید سکه «🪙 سکه‌هام» رو بزن.`,
+                     mainMenuKeyboard,
+              );
+              return;
        }
 
        // ─── ثبت درخواست و ارسال به طرف مقابل ────────────────
@@ -191,9 +190,10 @@ export async function acceptChatRequest(
        await request.accept();
 
        // ─── کسر سکه از کسی که درخواست داده ─────────────────
+       //  قانون: همیشه ۲ سکه از درخواست‌دهنده کم می‌شود (همه حالت‌ها)
        const requesterForCoin = await UserModel.findByTelegramId(fromId);
-       if (requesterForCoin && requesterForCoin.gender === Gender.Male && user.gender === Gender.Female) {
-              if (requesterForCoin.coins < COIN_COST_FEMALE_CHAT) {
+       if (requesterForCoin) {
+              if (requesterForCoin.coins < COIN_COST_CHAT) {
                      // سکه کافی ندارد — درخواست را رد کن
                      await request.reject();
                      await ctx.answerCbQuery('❌ فرستنده سکه کافی ندارد.');
@@ -207,7 +207,7 @@ export async function acceptChatRequest(
                      } catch { }
                      return;
               }
-              requesterForCoin.coins -= COIN_COST_FEMALE_CHAT;
+              requesterForCoin.coins -= COIN_COST_CHAT;
               await requesterForCoin.save();
        }
 
