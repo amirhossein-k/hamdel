@@ -223,7 +223,7 @@ export async function verifyAndCreditCoins(
        try {
               const pkg = COIN_PACKAGES.find((p) => p.id === transaction.package)!;
 
-              const verifyRes = await fetch('https://api.zarinpal.com/pg/v4/payment/verify.json', {
+              const verifyRes = await fetch('https://payment.zarinpal.com/pg/v4/payment/verify.json', {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/json' },
                      body: JSON.stringify({
@@ -238,6 +238,10 @@ export async function verifyAndCreditCoins(
                             code: number;
                      };
               };
+              console.log(
+                     'VERIFY RESPONSE:',
+                     JSON.stringify(verifyData, null, 2)
+              );
               if (verifyData.data?.code === 100 || verifyData.data?.code === 101) {
                      // پرداخت موفق
                      await transaction.markPaid(authority);
@@ -282,8 +286,14 @@ export async function verifyAndCreditCoins(
                      return { success: false, message: 'تأیید پرداخت ناموفق بود' };
               }
        } catch (err) {
-              console.error('[verifyAndCreditCoins] ERROR:', err);
-              await transaction.markFailed();
-              return { success: false, message: 'خطای داخلی' };
+              console.error(
+                     '[verifyAndCreditCoins] ERROR:',
+                     err
+              );
+
+              return {
+                     success: false,
+                     message: 'verify_error'
+              };;
        }
 }
