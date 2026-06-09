@@ -101,8 +101,8 @@ export async function initiatePurchase(
        const priceFormatted = pkg.price.toLocaleString('fa-IR');
 
        // ─── ساخت لینک پرداخت زرین‌پال ───────────────────
-       const callbackUrl = `${process.env.APP_URL}/api/payment/verify?txId=${transaction._id}`;
-
+       const callbackUrl =
+              `${process.env.APP_URL}/api/payment/verify`;
        try {
               const zarinRes = await fetch('https://api.zarinpal.com/pg/v4/payment/request.json', {
                      method: 'POST',
@@ -170,7 +170,7 @@ export async function initiatePurchase(
 // ══════════════════════════════════════════════════════════
 
 export async function verifyAndCreditCoins(
-       bot: Telegraf<BotContext>,
+
        txId: string,
        authority: string,
        status: string,
@@ -210,9 +210,17 @@ export async function verifyAndCreditCoins(
 
                      // اضافه کردن سکه به کاربر
                      const user = await UserModel.findByTelegramId(transaction.telegramId);
+
                      if (user) {
+
+
+
+
                             user.coins += transaction.coins;
                             await user.save();
+
+                            transaction.status = TransactionStatus.Paid;
+                            await transaction.save();
 
                             // ثبت لاگ
                             await CoinLogModel.record(
