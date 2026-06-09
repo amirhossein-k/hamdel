@@ -19,11 +19,13 @@ import {
        ChatType,
        MessageType,
        COIN_COST_CHAT,
+       CoinChangeReason,
        TargetGender,
        SearchMode,
 } from '@/types/enums';
 import { RandomQueueModel } from '@/models/queue.model';
 import { ChatModel, MessageModel } from '@/models/chat.model';
+import { CoinLogModel } from '@/models/coin.model';
 import { ReportModel } from '@/models/queue.model';
 import { UserModel } from '@/models/user.model';
 import {
@@ -486,14 +488,54 @@ export async function endChat(
        const closer = await UserModel.findByTelegramId(closerId);
        const partner = await UserModel.findByTelegramId(partnerId);
 
+       // ─── استرداد سکه اگر هیچ مکالمه‌ای شکل نگرفته ──────────
+       //
+       //  قانون: فقط اگر هیچ پیامی از هیچ طرفی ارسال نشده باشد،
+       //  سکه‌های کسرشده به هر دو کاربر برگردانده می‌شود.
+       //  اگر حتی یک پیام رد و بدل شده باشد، استردادی نیست.
+
+       const closerMsgCount = await MessageModel.countDocuments({ chatId, senderId: closerId });
+       const partnerMsgCount = await MessageModel.countDocuments({ chatId, senderId: partnerId });
+       const noConversation = closerMsgCount === 0 && partnerMsgCount === 0;
+
+       let closerRefunded = false;
+       let partnerRefunded = false;
+
+       if (noConversation) {
+              if (closer) { closer.coins += COIN_COST_CHAT; closerRefunded = true; }
+              if (partner) { partner.coins += COIN_COST_CHAT; partnerRefunded = true; }
+       }
+
+       // ─── ذخیره state و لاگ استرداد ──────────────────────────
        if (closer) { closer.state = UserState.Complete; await closer.save(); }
        if (partner) { partner.state = UserState.Complete; await partner.save(); }
 
-       const endMsg = '🔚 چت تموم شد.\n\nمی‌تونی یه چت جدید شروع کنی 👇';
-       await ctx.reply(endMsg, mainMenuKeyboard);
+       if (closerRefunded) {
+              await CoinLogModel.record(
+                     closerId, COIN_COST_CHAT, CoinChangeReason.Refund,
+                     closer!.coins, chatId,
+              );
+       }
+       if (partnerRefunded) {
+              await CoinLogModel.record(
+                     partnerId, COIN_COST_CHAT, CoinChangeReason.Refund,
+                     partner!.coins, chatId,
+              );
+       }
+
+       // ─── پیام پایان چت ───────────────────────────────────────
+       const refundNote = (refunded: boolean) =>
+              refunded ? `\n\n🪙 چون پیامی رد و بدل نشد، ${COIN_COST_CHAT} سکه به حسابت برگشت.` : '';
+
+       const closerEndMsg =
+              '🔚 چت تموم شد.\n\nمی‌تونی یه چت جدید شروع کنی 👇' + refundNote(closerRefunded);
+       const partnerEndMsg =
+              '🔚 چت تموم شد.\n\nمی‌تونی یه چت جدید شروع کنی 👇' + refundNote(partnerRefunded);
+
+       await ctx.reply(closerEndMsg, mainMenuKeyboard);
 
        try {
-              await bot.telegram.sendMessage(partnerId, endMsg, mainMenuKeyboard);
+              await bot.telegram.sendMessage(partnerId, partnerEndMsg, mainMenuKeyboard);
        } catch {
               // طرف مقابل ربات را بلاک کرده
        }
