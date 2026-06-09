@@ -155,12 +155,22 @@ export async function handleProfileBrowseStep(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function showProfileList(ctx: BotContext, filter: any, title: string, page = 0): Promise<void> {
        const me = ctx.dbUser!;
+       const blockedByMe = me.blockedUsers ?? [];
+
+       // کاربرانی که من را بلاک کرده‌اند
+       const blockedMeDocs = await UserModel.find(
+              { blockedUsers: me.telegramId },
+              { telegramId: 1 },
+       ).lean();
+       const blockedMe = blockedMeDocs.map(d => d.telegramId);
+
+       const excludeIds = [me.telegramId, ...blockedByMe, ...blockedMe];
 
        const query = {
               ...filter,
               profileComplete: true,
               isBanned: false,
-              telegramId: { $ne: me.telegramId },
+              telegramId: { $nin: excludeIds },
        };
 
        const total = await UserModel.countDocuments(query);
@@ -308,13 +318,20 @@ export async function handleViewProfileCallback(
        const isSelf = me.telegramId === targetId;
        const isFemale = target.gender === Gender.Female;
        const coinLabel = isFemale ? ` (۲🪙)` : '';
+       const isBlocked = me.blockedUsers?.includes(targetId);
 
        const buttons = isSelf ? [] : [
               [
                      Markup.button.callback(`💬 درخواست چت${coinLabel}`, `profile_chat:${targetId}`),
                      Markup.button.callback('📩 ارسال پیام', `profile_msg:${targetId}`),
               ],
-              [Markup.button.callback('🚨 گزارش کاربر', `profile_report:${targetId}`)],
+              [
+                     Markup.button.callback(
+                            isBlocked ? '🔓 رفع بلاک' : '🚫 بلاک کاربر',
+                            `profile_block:${targetId}`,
+                     ),
+                     Markup.button.callback('🚨 گزارش کاربر', `profile_report:${targetId}`),
+              ],
        ];
 
        const kb = Markup.inlineKeyboard(buttons);
@@ -502,4 +519,41 @@ export async function handleProfileReportCallback(
               '🚨 دلیل گزارش رو بنویس:\n\n(مثلاً: تصویر نامناسب، رفتار آزاردهنده، ...)',
               { reply_markup: { remove_keyboard: true } },
        );
+}
+
+// ══════════════════════════════════════════════════════════
+//  بلاک / رفع بلاک کاربر  (callback: profile_block:ID)
+// ══════════════════════════════════════════════════════════
+
+export async function handleProfileBlockCallback(ctx: BotContext): Promise<void> {
+       await ctx.answerCbQuery();
+       if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
+
+       const targetId = Number(ctx.callbackQuery.data.split(':')[1]);
+       const me = ctx.dbUser!;
+
+       if (me.telegramId === targetId) return;
+
+       const isBlocked = me.blockedUsers?.includes(targetId);
+
+       if (isBlocked) {
+              // رفع بلاک
+              me.blockedUsers = me.blockedUsers.filter(id => id !== targetId);
+              await me.save();
+              await ctx.answerCbQuery('✅ بلاک رفع شد.', { show_alert: true });
+
+              // آپدیت دکمه‌ها — نمایش مجدد پروفایل
+              await ctx.reply('🔓 بلاک این کاربر برداشته شد.');
+       } else {
+              // بلاک
+              if (!me.blockedUsers) me.blockedUsers = [];
+              me.blockedUsers.push(targetId);
+              await me.save();
+              await ctx.answerCbQuery('🚫 کاربر بلاک شد.', { show_alert: true });
+              await ctx.reply(
+                     '🚫 این کاربر بلاک شد.\n\n' +
+                     '• پروفایلش در جستجوها نمایش داده نمی‌شود\n' +
+                     '• در چت‌های تصادفی به هم وصل نمی‌شوید',
+              );
+       }
 }

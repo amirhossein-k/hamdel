@@ -37,6 +37,7 @@ export interface IUser {
        isBanned: boolean;
        banReason?: string;
        warnings: number;
+       blockedUsers: number[];      // لیست telegramId های بلاک‌شده
        registeredAt: Date;
        lastActive: Date;
        state: UserState;
@@ -92,6 +93,7 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
               isBanned: { type: Boolean, default: false, index: true },
               banReason: { type: String },
               warnings: { type: Number, default: 0, min: 0 },
+              blockedUsers: { type: [Number], default: [] },
               registeredAt: { type: Date, default: () => new Date() },
               lastActive: { type: Date, default: () => new Date() },
               state: { type: String, enum: Object.values(UserState), default: UserState.Start },

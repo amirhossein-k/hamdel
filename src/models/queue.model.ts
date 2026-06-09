@@ -35,7 +35,7 @@ export interface IRandomQueueModel extends Model<IRandomQueueDocument> {
        /** کاربر را از صف خارج می‌کند */
        dequeue(telegramId: number): Promise<void>;
        /** مچ مناسب را با توجه به searchMode پیدا می‌کند */
-       findMatch(excludeId: number, entry: IRandomQueueDocument): Promise<IRandomQueueDocument | null>;
+       findMatch(excludeId: number, entry: IRandomQueueDocument, blockedByMe: number[], blockedMe: number[]): Promise<IRandomQueueDocument | null>;
        /** آیا کاربر در صف است */
        isQueued(telegramId: number): Promise<boolean>;
 }
@@ -105,9 +105,14 @@ RandomQueueSchema.statics.dequeue = function (
 RandomQueueSchema.statics.findMatch = function (
        excludeId: number,
        entry: IRandomQueueDocument,
+       blockedByMe: number[] = [],
+       blockedMe: number[] = [],
 ): Promise<IRandomQueueDocument | null> {
+       // کاربرانی که باید حذف شوند: خود کاربر + بلاک‌شده‌ها (دوطرفه)
+       const excludeIds = [excludeId, ...blockedByMe, ...blockedMe];
+
        const query: Record<string, unknown> = {
-              telegramId: { $ne: excludeId },
+              telegramId: { $nin: excludeIds },
        };
 
        // ─── فیلتر جنسیت طرف مقابل ───────────────────────────────

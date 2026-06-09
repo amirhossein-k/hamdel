@@ -351,8 +351,15 @@ export async function joinRandomQueue(
               extra,
        );
 
-       // ─── جستجوی مچ ───────────────────────────────────────
-       const match = await RandomQueueModel.findMatch(user.telegramId, myEntry);
+       // ─── جستجوی مچ (با فیلتر بلاک‌شده‌ها) ──────────────────
+       // کاربرانی که من بلاک کرده‌ام یا آن‌ها من را بلاک کرده‌اند
+       const blockedByMe = user.blockedUsers ?? [];
+       const blockedMe = await UserModel.find(
+              { blockedUsers: user.telegramId },
+              { telegramId: 1 },
+       ).lean().then(docs => docs.map(d => d.telegramId));
+
+       const match = await RandomQueueModel.findMatch(user.telegramId, myEntry, blockedByMe, blockedMe);
 
        if (match) {
               const partner = await UserModel.findByTelegramId(match.telegramId);
@@ -374,13 +381,23 @@ export async function joinRandomQueue(
               //  چون قبل از ورود به صف سکه کافی چک شد،
               //  اینجا فقط کسر می‌کنیم و نیازی به re-check نیست.
 
+              // ─── ساخت chatId ─────────────────────────────────────
+              const chatId = nanoid(12);
+
+              // ─── کسر سکه هنگام مچ ────────────────────────────────
               if (!isRandomFree) {
                      user.coins -= COIN_COST_CHAT;
                      await user.save();
+                     await CoinLogModel.record(
+                            user.telegramId,
+                            -COIN_COST_CHAT,
+                            CoinChangeReason.ChatFemale,
+                            user.coins,
+                            chatId,
+                     );
               }
 
               // ─── ساخت چت جدید ────────────────────────────────
-              const chatId = nanoid(12);
               await ChatModel.create({
                      chatId,
                      participants: [user.telegramId, partner.telegramId],
@@ -488,12 +505,7 @@ export async function endChat(
        const closer = await UserModel.findByTelegramId(closerId);
        const partner = await UserModel.findByTelegramId(partnerId);
 
-       // ─── استرداد سکه اگر هیچ مکالمه‌ای شکل نگرفته ──────────
-       //
-       //  قانون: فقط اگر هیچ پیامی از هیچ طرفی ارسال نشده باشد،
-       //  سکه‌های کسرشده به هر دو کاربر برگردانده می‌شود.
-       //  اگر حتی یک پیام رد و بدل شده باشد، استردادی نیست.
-
+       // ─── بررسی آیا پیامی رد و بدل شده ──────────────────────
        const closerMsgCount = await MessageModel.countDocuments({ chatId, senderId: closerId });
        const partnerMsgCount = await MessageModel.countDocuments({ chatId, senderId: partnerId });
        const noConversation = closerMsgCount === 0 && partnerMsgCount === 0;
@@ -502,38 +514,59 @@ export async function endChat(
        let partnerRefunded = false;
 
        if (noConversation) {
-              if (closer) { closer.coins += COIN_COST_CHAT; closerRefunded = true; }
-              if (partner) { partner.coins += COIN_COST_CHAT; partnerRefunded = true; }
+              // پیدا کردن لاگ کسر سکه برای این chatId (فیلد صحیح: change و refId)
+              const closerDeductLog = await CoinLogModel.findOne({
+                     telegramId: closerId,
+                     change: { $lt: 0 },
+                     refId: chatId,
+              });
+              const partnerDeductLog = await CoinLogModel.findOne({
+                     telegramId: partnerId,
+                     change: { $lt: 0 },
+                     refId: chatId,
+              });
+
+              if (closer && closerDeductLog) {
+                     const refundAmount = Math.abs(closerDeductLog.change);
+                     closer.coins += refundAmount;
+                     closerRefunded = true;
+                     await CoinLogModel.record(
+                            closerId, refundAmount, CoinChangeReason.Refund,
+                            closer.coins, chatId,
+                     );
+              }
+              if (partner && partnerDeductLog) {
+                     const refundAmount = Math.abs(partnerDeductLog.change);
+                     partner.coins += refundAmount;
+                     partnerRefunded = true;
+                     await CoinLogModel.record(
+                            partnerId, refundAmount, CoinChangeReason.Refund,
+                            partner.coins, chatId,
+                     );
+              }
        }
 
-       // ─── ذخیره state و لاگ استرداد ──────────────────────────
+       // ─── ذخیره state ─────────────────────────────────────────
        if (closer) { closer.state = UserState.Complete; await closer.save(); }
        if (partner) { partner.state = UserState.Complete; await partner.save(); }
 
-       if (closerRefunded) {
-              await CoinLogModel.record(
-                     closerId, COIN_COST_CHAT, CoinChangeReason.Refund,
-                     closer!.coins, chatId,
-              );
-       }
-       if (partnerRefunded) {
-              await CoinLogModel.record(
-                     partnerId, COIN_COST_CHAT, CoinChangeReason.Refund,
-                     partner!.coins, chatId,
-              );
-       }
-
        // ─── پیام پایان چت ───────────────────────────────────────
-       const refundNote = (refunded: boolean) =>
-              refunded ? `\n\n🪙 چون پیامی رد و بدل نشد، ${COIN_COST_CHAT} سکه به حسابت برگشت.` : '';
+       const refundNote = (refunded: boolean, amount: number) =>
+              refunded ? `\n\n🪙 چون پیامی رد و بدل نشد، ${amount} سکه به حسابت برگشت.` : '';
 
-       const closerEndMsg =
-              '🔚 چت تموم شد.\n\nمی‌تونی یه چت جدید شروع کنی 👇' + refundNote(closerRefunded);
-       const partnerEndMsg =
-              '🔚 چت تموم شد.\n\nمی‌تونی یه چت جدید شروع کنی 👇' + refundNote(partnerRefunded);
+       const closerRefundAmount = closerRefunded
+              ? Math.abs((await CoinLogModel.findOne({ telegramId: closerId, refId: chatId, change: { $gt: 0 } }))?.change ?? COIN_COST_CHAT)
+              : 0;
+       const partnerRefundAmount = partnerRefunded
+              ? Math.abs((await CoinLogModel.findOne({ telegramId: partnerId, refId: chatId, change: { $gt: 0 } }))?.change ?? COIN_COST_CHAT)
+              : 0;
+
+       const closerEndMsg = '🔚 چت تموم شد.\n\nمی‌تونی یه چت جدید شروع کنی 👇' +
+              refundNote(closerRefunded, closerRefundAmount);
+       const partnerEndMsg = '🔚 چت تموم شد.\n\nمی‌تونی یه چت جدید شروع کنی 👇' +
+              refundNote(partnerRefunded, partnerRefundAmount);
 
        await ctx.reply(closerEndMsg, mainMenuKeyboard);
-
        try {
               await bot.telegram.sendMessage(partnerId, partnerEndMsg, mainMenuKeyboard);
        } catch {

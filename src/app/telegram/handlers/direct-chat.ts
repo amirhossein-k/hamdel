@@ -12,10 +12,11 @@
 
 import { Markup, Telegraf } from 'telegraf';
 import type { BotContext } from '../context';
-import { UserState, ChatType, ChatRequestStatus, COIN_COST_CHAT } from '@/types/enums';
+import { UserState, ChatType, ChatRequestStatus, COIN_COST_CHAT, CoinChangeReason } from '@/types/enums';
 import { ChatModel } from '@/models/chat.model';
 import { ChatRequestModel } from '@/models/inbox.model';
 import { UserModel } from '@/models/user.model';
+import { CoinLogModel } from '@/models/coin.model';
 import { inChatKeyboard, mainMenuKeyboard } from '@/lib/keyboards';
 import { nanoid } from 'nanoid';
 import { endChat } from './random-chat';
@@ -269,15 +270,41 @@ export async function rejectChatRequest(
 
        await request.reject();
 
+       // ─── استرداد سکه به فرستنده ───────────────────────────
+       const requester = await UserModel.findByTelegramId(fromId);
+       if (requester) {
+              // پیدا کردن لاگ کسر سکه برای این درخواست (فیلدهای صحیح: change و refId)
+              const deductLog = await CoinLogModel.findOne({
+                     telegramId: fromId,
+                     change: { $lt: 0 },
+                     refId: String(user.telegramId),
+              }).sort({ createdAt: -1 });
+
+              if (deductLog) {
+                     const refundAmount = Math.abs(deductLog.change);
+                     requester.coins += refundAmount;
+                     await requester.save();
+                     await CoinLogModel.record(
+                            fromId,
+                            refundAmount,
+                            CoinChangeReason.Refund,
+                            requester.coins,
+                            String(user.telegramId),
+                     );
+              }
+       }
+
        // ویرایش پیام درخواست
        await ctx.editMessageText(`💬 درخواست چت ❌ رد شد.`).catch(() => { });
        await ctx.answerCbQuery('درخواست رد شد.');
 
        // اطلاع به فرستنده
        try {
+              const refundMsg = requester
+                     ? `\n\n🪙 سکه کسرشده به حسابت برگشت.` : '';
               await bot.telegram.sendMessage(
                      fromId,
-                     `❌ <b>${user.name}</b> درخواست چتت رو رد کرد.`,
+                     `❌ <b>${user.name}</b> درخواست چتت رو رد کرد.${refundMsg}`,
                      { parse_mode: 'HTML' },
               );
        } catch {

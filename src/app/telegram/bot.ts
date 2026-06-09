@@ -46,6 +46,7 @@ import {
        handleProfileChatCallback,
        handleProfileMsgCallback,
        handleProfileReportCallback,
+       handleProfileBlockCallback,
        handleBrowsePageCallback,
 } from './handlers/profile-browse';
 
@@ -107,6 +108,7 @@ bot.action(/^view_profile:(\d+)$/, (ctx) => handleViewProfileCallback(ctx, bot))
 bot.action(/^profile_chat:(\d+)$/, (ctx) => handleProfileChatCallback(ctx, bot));
 bot.action(/^profile_msg:(\d+)$/, (ctx) => handleProfileMsgCallback(ctx));
 bot.action(/^profile_report:(\d+)$/, (ctx) => handleProfileReportCallback(ctx, bot));
+bot.action(/^profile_block:(\d+)$/, (ctx) => handleProfileBlockCallback(ctx));
 bot.action(/^browse_page:/, (ctx) => handleBrowsePageCallback(ctx));
 bot.action(/^reject_chat:(\d+)$/, async (ctx) => {
        await rejectChatRequest(ctx, bot, Number(ctx.match[1]));
